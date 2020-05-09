@@ -55,7 +55,6 @@ library(readr)
 # data clean
 
 ```{r}
-
 The_interest_rate_for_the_United_States<- read_csv("The interest rate for the United States, from 2008 - 2018.csv")
 plot(Volume ~ Date , data=The_interest_rate_for_the_United_States)
 ```
@@ -68,11 +67,14 @@ Dow_Jones_Industrial_Average_from_April <- read_csv("Dow Jones Industrial Averag
 
 ```
 This dataset we will use the INTDSRUSM193N columns.
+
 ```{r}
 Apple_Inc_company_stock <- read_csv("Apple Inc. - company stock.csv")
 plot(Volume ~ Date , data=Apple_Inc_company_stock)
 ```
 This dataset we will use the Adj Close and volume columns.
+
+
 # Results 
 The results section should contain numerical or graphical summaries of your results. You should report a final model you have chosen. There is not necessarily one, singular correct model, but certainly some methods and models are better than others in certain situations. You may use any methods we studied this semester to complete this task, and provide evidence that your final choice of model is a good one. Some possible items to be discussed:
 
