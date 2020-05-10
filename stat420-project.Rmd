@@ -51,11 +51,14 @@ Narrative of your step-by-step decision making process throughout the analysis a
 ```{r}
 # install necessary packages
 # install.packages("readxl")
+# install.packages("sqldf")
 ```
 
 ```{r}
 library(readr)
 library("readxl")
+library(sqldf)
+library(glue)
 ```
 
 # data clean
@@ -63,15 +66,20 @@ library("readxl")
 # price of bitcoin
 Bitcoin <- read_csv("Bitcoin Historical Data - Investing.com.csv")
 Bitcoin$Date = as.Date(Bitcoin$Date, format="%b %d, %Y")
+Bitcoin$month <- strftime(Bitcoin$Date, "%m")
+Bitcoin$year <- strftime(Bitcoin$Date, "%Y")
 plot(Price ~ Date, data=Bitcoin)
 ```
 ```{r}
 President <- read_csv("President.csv")
-plot(president_Code ~ Date, data=president)
+President$Date = as.Date(President$Date, format="%b %d, %Y")
+plot(president_code ~ Date, data=President)
 ```
 
 ```{r}
 The_interest_rate_for_the_United_States<- read_csv("The interest rate for the United States, from 2010 - 2020.csv")
+The_interest_rate_for_the_United_States$month <- strftime(The_interest_rate_for_the_United_States$Date, "%m")
+The_interest_rate_for_the_United_States$year <- strftime(The_interest_rate_for_the_United_States$Date, "%Y")
 plot(interest_rate ~ Date, data=The_interest_rate_for_the_United_States)
 ```
 
@@ -85,30 +93,90 @@ This dataset we will use the Volume and Adj Close columns.
 
 
 ```{r}
-Dow_Jones_Industrial_Average <- read_csv("Dow Jones Industrial Average.csv")
-plot(Adj_Close ~ Date, data=Dow_Jones_Industrial_Average)
+Dow_Jones_Industrial_Average <- read_csv("Dow Jones Industrial Average Historical Data.csv")
+Dow_Jones_Industrial_Average$Date = as.Date(Dow_Jones_Industrial_Average$Date, format="%b %d, %Y")
+plot(Price ~ Date, data=Dow_Jones_Industrial_Average)
 ```
 ```{r}
-NYSE_Composite_Index <- read_csv("NYSE Composite Index.csv")
-plot(Adj_Close ~ Date, data=NYSE_Composite_Index)
+NYSE_Composite_Index <- read_csv("NYSE Composite Historical Data.csv")
+NYSE_Composite_Index$Date = as.Date(NYSE_Composite_Index$Date, format="%b %d, %Y")
+plot(Price ~ Date, data=NYSE_Composite_Index)
 ```
 
 
 ```{r}
-Apple_Inc_company_stock <- read_csv("Apple Inc. - company stock.csv")
-# plot(Volume ~ Date, data=Apple_Inc_company_stock)
-plot(Adj_Close ~ Date, data=Apple_Inc_company_stock)
+Apple_Inc_company_stock <- read_csv("AAPL Historical Data.csv")
+Apple_Inc_company_stock$Date = as.Date(Apple_Inc_company_stock2$Date, format="%b %d, %Y")
+plot(Price ~ Date, data=Apple_Inc_company_stock)
 ```
 This dataset we will use the Adj Close and volume columns.
 
 ```{r}
-Crude_Oil_price <- read_excel("Crude Oil Prices Daily.xlsx")
-Crude_Oil_price$Date = as.Date(Crude_Oil_price$Date, format="%m/%d/%Y")
-plot(Closing_Price ~ Date, data=Crude_Oil_price)
+WTI_oil_price <- read_csv("Crude Oil WTI Futures Historical Data.csv")
+WTI_oil_price$Date = as.Date(WTI_oil_price$Date, format="%b %d, %Y")
+# colnames(WTI_oil_price)[2] <- "WTI_oil_price"
+plot(Price ~ Date, data=WTI_oil_price)
 
-Brent_Oil_price <- read_csv("BrentOilPrices.csv")
-Brent_Oil_price$Date = as.Date(Brent_Oil_price$Date, format="%d-%b-%y")
+Brent_Oil_price <- read_csv("Brent Oil Futures Historical Data.csv")
+Brent_Oil_price$Date = as.Date(Brent_Oil_price$Date, format="%b %d, %Y")
+# colnames(Brent_Oil_price)[2] <- "Brent_oil_price"
 plot(Price ~ Date, data=Brent_Oil_price)
+```
+
+```{r}
+# combine
+# Reduce(function(...) merge(..., by="Date"), list(Brent_Oil_price, Crude_Oil_price, Apple_compact))
+sql =  glue("
+select Bitcoin.Date,
+       Bitcoin.Price         as Bitcoin_price,
+       exchange.Yuan_USD_exchange_rate,
+       DJIA.Price            as DJIA_index,
+       NYSE.Price            as NYSE_index,
+       Apple.Price           as Apple_price,
+       Brent_Oil_price.Price as brent_oil_price,
+       WTI_oil_price.Price   as WTI_oil_price,
+       President.president_code,
+       interest.interest_rate,
+       Bitcoin.month,
+       Bitcoin.year
+from Bitcoin
+         left outer join US_dollar_yuan_exchange_rate as exchange
+                         on exchange.Date = Bitcoin.Date
+         left outer join Dow_Jones_Industrial_Average as DJIA
+                         on DJIA.Date = exchange.Date
+         left outer join NYSE_Composite_Index as NYSE
+                         on NYSE.Date = DJIA.Date
+         left outer join Brent_Oil_price
+                         on Brent_Oil_price.Date = Bitcoin.Date
+         left outer join WTI_oil_price
+                         on WTI_oil_price.Date = Bitcoin.Date
+         left outer join Apple_Inc_company_stock as Apple
+                         on Apple.Date = NYSE.Date
+         left outer join President
+                         on President.Date = Bitcoin.Date
+         left outer join The_interest_rate_for_the_United_States as interest
+                         on interest.month = Bitcoin.month
+                             and interest.year = Bitcoin.year
+where Bitcoin.Date between {c (1.0, as.Date('2010-09-01'))[2]} and {c (1.0, as.Date('2020-04-30'))[2]}
+order by Bitcoin.Date desc")
+combined_daily = sqldf(sql)
+combined_daily
+
+combined_weekdays = na.omit(combined_daily)
+combined_monthly = sqldf("
+select *
+from combined_daily
+where combined_daily.Date in
+      (select max(combined_weekdays.Date)
+       from combined_weekdays
+       group by combined_weekdays.month, combined_weekdays.year)
+")
+```
+```{r}
+combined_weekday = na.omit(combined_daily) 
+# combined_weekday
+combined_weekday
+combined_weekday
 ```
 
 # Results 
