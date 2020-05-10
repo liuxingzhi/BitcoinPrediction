@@ -52,6 +52,7 @@ Narrative of your step-by-step decision making process throughout the analysis a
 # install necessary packages
 # install.packages("readxl")
 # install.packages("sqldf")
+# install.packages("corrplot")
 ```
 
 ```{r}
@@ -59,6 +60,7 @@ library(readr)
 library("readxl")
 library(sqldf)
 library(glue)
+library("corrplot")
 options(digits=6)
 ```
 
@@ -69,7 +71,7 @@ Bitcoin <- read_csv("Bitcoin Historical Data - Investing.com.csv")
 Bitcoin$Date = as.Date(Bitcoin$Date, format="%b %d, %Y")
 Bitcoin$month <- strftime(Bitcoin$Date, "%m")
 Bitcoin$year <- strftime(Bitcoin$Date, "%Y")
-plot(Price ~ Date, data=Bitcoin)
+plot(Price ~ Date, data=Bitcoin, type = "l")
 ```
 ```{r}
 President <- read_csv("President.csv")
@@ -81,41 +83,41 @@ plot(president_code ~ Date, data=President)
 The_interest_rate_for_the_United_States<- read_csv("The interest rate for the United States, from 2010 - 2020.csv")
 The_interest_rate_for_the_United_States$month <- strftime(The_interest_rate_for_the_United_States$Date, "%m")
 The_interest_rate_for_the_United_States$year <- strftime(The_interest_rate_for_the_United_States$Date, "%Y")
-plot(interest_rate ~ Date, data=The_interest_rate_for_the_United_States)
+plot(interest_rate ~ Date, data=The_interest_rate_for_the_United_States, type = "o")
 ```
 
 ```{r}
 US_dollar_yuan_exchange_rate <- read_csv("US dollar-yuan exchange rate.csv")
 US_dollar_yuan_exchange_rate$Date = as.Date(US_dollar_yuan_exchange_rate$Date, format="%m/%d/%y")
-plot(exchange_rate ~ Date, data = US_dollar_yuan_exchange_rate)
+plot(exchange_rate ~ Date, data = US_dollar_yuan_exchange_rate, type = 'l')
 
 Euro_to_US_exchange_rate <- read_csv("euro-dollar-exchange-rate-historical-chart.csv")
 Euro_to_US_exchange_rate$Date = as.Date(Euro_to_US_exchange_rate$Date, format="%m/%d/%y")
 Euro_to_US_exchange_rate$exchange_rate = 1/Euro_to_US_exchange_rate$exchange_rate
-plot(exchange_rate  ~ Date, data = Euro_to_US_exchange_rate)
+plot(exchange_rate  ~ Date, data = Euro_to_US_exchange_rate, type = 'l')
 ```
 ```{r}
 Gold <- read_csv("Gold Futures Historical Data.csv")
 Gold$Date = as.Date(Gold$Date, format="%b %d, %Y")
-plot(Price ~ Date, data=Gold)
+plot(Price ~ Date, data=Gold, type='l')
 ```
 This dataset we will use the Volume and Price columns.
 ```{r}
 Dow_Jones_Industrial_Average <- read_csv("Dow Jones Industrial Average Historical Data.csv")
 Dow_Jones_Industrial_Average$Date = as.Date(Dow_Jones_Industrial_Average$Date, format="%b %d, %Y")
-plot(Price ~ Date, data=Dow_Jones_Industrial_Average)
+plot(Price ~ Date, data=Dow_Jones_Industrial_Average, type = 'l')
 ```
 ```{r}
 NYSE_Composite_Index <- read_csv("NYSE Composite Historical Data.csv")
 NYSE_Composite_Index$Date = as.Date(NYSE_Composite_Index$Date, format="%b %d, %Y")
-plot(Price ~ Date, data=NYSE_Composite_Index)
+plot(Price ~ Date, data=NYSE_Composite_Index, type = 'l')
 ```
 
 
 ```{r}
 Apple_Inc_company_stock <- read_csv("AAPL Historical Data.csv")
 Apple_Inc_company_stock$Date = as.Date(Apple_Inc_company_stock$Date, format="%b %d, %Y")
-plot(Price ~ Date, data=Apple_Inc_company_stock)
+plot(Price ~ Date, data=Apple_Inc_company_stock, type = 'l')
 ```
 This dataset we will use the Adj Close and volume columns.
 
@@ -128,7 +130,7 @@ plot(Price ~ Date, data=WTI_oil_price)
 Brent_Oil_price <- read_csv("Brent Oil Futures Historical Data.csv")
 Brent_Oil_price$Date = as.Date(Brent_Oil_price$Date, format="%b %d, %Y")
 # colnames(Brent_Oil_price)[2] <- "Brent_oil_price"
-plot(Price ~ Date, data=Brent_Oil_price)
+plot(Price ~ Date, data=Brent_Oil_price, type = 'l')
 ```
 
 ```{r}
@@ -171,10 +173,10 @@ from Bitcoin
          left outer join The_interest_rate_for_the_United_States as interest
                          on interest.month = Bitcoin.month
                              and interest.year = Bitcoin.year
-where Bitcoin.Date between {c (1.0, as.Date('2010-09-01'))[2]} and {c (1.0, as.Date('2020-04-30'))[2]}
+where Bitcoin.Date between {c (1.0, as.Date('2014-09-01'))[2]} and {c (1.0, as.Date('2020-04-30'))[2]}
 order by Bitcoin.Date desc")
 combined_daily = sqldf(sql)
-combined_daily
+combined_daily$Date_posix = c(1, as.Date(combined_daily$Date))[-c(1)]
 
 combined_weekdays = na.omit(combined_daily)
 combined_monthly = sqldf("
@@ -187,15 +189,95 @@ where combined_daily.Date in
 ")
 combined_monthly
 ```
+```{r}
+str(combined_monthly[, -c(1, 13, 14)])
+```
+
 
 
 # Results 
 The results section should contain numerical or graphical summaries of your results. You should report a final model you have chosen. There is not necessarily one, singular correct model, but certainly some methods and models are better than others in certain situations. You may use any methods we studied this semester to complete this task, and provide evidence that your final choice of model is a good one. Some possible items to be discussed:
+```{r}
+combined_monthly = na.omit(combined_monthly)
+M <- cor(x=combined_monthly[, -c(1, 13, 14)], use = "everything", method="pearson") # get correlations
+M
+library('corrplot') #package corrplot
+corrplot(M, method = "circle")
+```
 
 ```{r}
-btc_lm = lm(Bitcoin_price ~ . -Date ,data=combined_monthly[, -c(11:12)])
+btc_lm = lm(Bitcoin_price ~ . ,data=combined_monthly[, -c(3, 5, 7, 9, 11, 12, 13, 14)])
 summary(btc_lm)
 ```
+```{r}
+gamble_model = lm(Bitcoin_price~ . ,combined_monthly[, -c(1, 13, 14)])
+gamble_model_back_aic = step(gamble_model, direction = "backward", trace = 0)
+gamble_model_back_aic
+```
+```{r}
+library(leaps)
+all_hipcenter_mod = summary(regsubsets(Bitcoin_price ~ ., data = combined_monthly[, -c(1, 13, 14)]))
+all_hipcenter_mod
+```
+```{r}
+all_hipcenter_mod$which
+all_hipcenter_mod$rss
+all_hipcenter_mod$adjr2
+```
+```{r}
+pairs(combined_monthly[, -c(1, 13, 14)], col = "dodgerblue")
+```
+
+```{r}
+# Date USD_Yuan_exchange_rate USD_Euro_Exchange_Rate DJIA_index NYSE_index Apple_price brent_oil_price WTI_oil_price Gold_price president_code interest_rate
+# autompg_big_mod = lm(
+#   log(Bitcoin_price) ~ . ^ 2 + I(disp ^ 2) + I(hp ^ 2) + I(wt ^ 2) + I(acc ^ 2), 
+#   data = combined_monthly[, -c(13, 14)])
+autompg_big_mod = lm(
+  log(Bitcoin_price) ~ . ^ 2, 
+  data = combined_monthly[, -c(1, 13, 14)])
+all_hipcenter_mod = summary(regsubsets(log(Bitcoin_price) ~ ., data = combined_monthly[, -c(1, 13, 14, 15)]))
+# autompg_mod_back_aic = step(autompg_big_mod, direction = "backward", trace = 0)
+# autompg_mod_back_aic
+all_hipcenter_mod
+all_hipcenter_mod$which
+all_hipcenter_mod$rss
+all_hipcenter_mod$adjr2
+```
+```{r}
+# autompg_big_mod = lm(
+#   log(Bitcoin_price) ~ . ^ 2 + I(Date_posix ^ 2) + I(USD_Yuan_exchange_rate ^ 2) + I(USD_Euro_Exchange_Rate ^ 2) + I(DJIA_index ^ 2) +  + I(NYSE_index ^ 2) +  + I(Apple_price ^ 2) +  + I(brent_oil_price ^ 2) +  + I(WTI_oil_price ^ 2) + I(Gold_price ^ 2) + I(president_code ^ 2) + I(interest_rate ^ 2), 
+#   data = combined_monthly[, -c(1, 13, 14)])
+# length(coef(autompg_big_mod))
+
+autompg_big_mod = lm(
+  Bitcoin_price ~ . + I(Date_posix ^ 2) + I(USD_Yuan_exchange_rate ^ 2) + I(USD_Euro_Exchange_Rate ^ 2) + I(DJIA_index ^ 2) +  + I(NYSE_index ^ 2) +  + I(Apple_price ^ 2) +  + I(brent_oil_price ^ 2) +  + I(WTI_oil_price ^ 2) + I(Gold_price ^ 2) + I(president_code ^ 2) + I(interest_rate ^ 2), 
+  data = combined_monthly[, -c(1, 13, 14)])
+length(coef(autompg_big_mod))
+
+# autompg_mod_back_aic = step(autompg_big_mod, direction = "backward", trace = 0)
+# autompg_mod_back_aic
+
+n = length(resid(autompg_big_mod))
+autompg_mod_back_aic = step(autompg_big_mod, direction = "backward", trace = 0)
+length(coef(autompg_mod_back_aic))
+autompg_mod_back_aic
+autompg_mod_back_bic = step(autompg_big_mod, direction = "backward", 
+                            k = log(n), trace = 0)
+length(coef(autompg_mod_back_bic))
+autompg_mod_back_bic
+
+btc_lm = lm(Bitcoin_price ~ . ,data=combined_monthly[, -c(1, 13, 14)])
+autompg_big_mod = lm(
+  Bitcoin_price ~ Date_posix + USD_Yuan_exchange_rate +  USD_Euro_Exchange_Rate + DJIA_index + NYSE_index + Apple_price +  I(Date_posix ^ 2) + brent_oil_price + Gold_price + WTI_oil_price +president_code +  interest_rate + I(USD_Yuan_exchange_rate ^ 2) + I(USD_Euro_Exchange_Rate ^ 2) + I(DJIA_index ^ 2) +  + I(NYSE_index ^ 2) +  + I(Apple_price ^ 2) +  + I(brent_oil_price ^ 2) +  + I(WTI_oil_price ^ 2) + I(Gold_price ^ 2) + I(president_code ^ 2) + I(interest_rate ^ 2), 
+  data = combined_monthly[, -c(1, 13, 14)])
+summary(autompg_big_mod)
+```
+```{r}
+btc_lm = lm(Bitcoin_price ~ USD_Yuan_exchange_rate + USD_Euro_Exchange_Rate + DJIA_index + brent_oil_price + president_code ,data=combined_monthly[, -c(1, 13, 14)])
+summary(btc_lm)
+```
+
 
 # Discussion
 The discussion section should contain discussion of your results and should frame your results in the context of the data. How is your final model useful?
