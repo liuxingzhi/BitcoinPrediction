@@ -74,6 +74,10 @@ plot(president_Code ~ Date, data=president)
 The_interest_rate_for_the_United_States<- read_csv("The interest rate for the United States, from 2010 - 2020.csv")
 plot(interest_rate ~ Date, data=The_interest_rate_for_the_United_States)
 ```
+```{r}
+US_dollar_yuan_exchange_rate <- read_csv("US dollar-yuan exchange rate.csv")
+plot(Yuan USD exchange rate ~ Date, data = US_dollar_yuan_exchange_rate)
+```
 
 This dataset we will use the Volume and Adj Close columns.
 
