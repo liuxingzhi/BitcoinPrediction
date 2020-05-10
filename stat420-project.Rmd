@@ -65,6 +65,10 @@ Bitcoin <- read_csv("Bitcoin Historical Data - Investing.com.csv")
 Bitcoin$Date = as.Date(Bitcoin$Date, format="%b %d, %Y")
 plot(Price ~ Date, data=Bitcoin)
 ```
+```{r}
+President <- read_csv("President.csv")
+plot(president_Code ~ Date, data=president)
+```
 
 ```{r}
 The_interest_rate_for_the_United_States<- read_csv("The interest rate for the United States, from 2010 - 2020.csv")
