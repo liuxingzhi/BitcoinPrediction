@@ -106,7 +106,7 @@ plot(Price ~ Date, data=NYSE_Composite_Index)
 
 ```{r}
 Apple_Inc_company_stock <- read_csv("AAPL Historical Data.csv")
-Apple_Inc_company_stock$Date = as.Date(Apple_Inc_company_stock2$Date, format="%b %d, %Y")
+Apple_Inc_company_stock$Date = as.Date(Apple_Inc_company_stock$Date, format="%b %d, %Y")
 plot(Price ~ Date, data=Apple_Inc_company_stock)
 ```
 This dataset we will use the Adj Close and volume columns.
@@ -171,13 +171,9 @@ where combined_daily.Date in
        from combined_weekdays
        group by combined_weekdays.month, combined_weekdays.year)
 ")
+combined_monthly
 ```
-```{r}
-combined_weekday = na.omit(combined_daily) 
-# combined_weekday
-combined_weekday
-combined_weekday
-```
+
 
 # Results 
 The results section should contain numerical or graphical summaries of your results. You should report a final model you have chosen. There is not necessarily one, singular correct model, but certainly some methods and models are better than others in certain situations. You may use any methods we studied this semester to complete this task, and provide evidence that your final choice of model is a good one. Some possible items to be discussed:
