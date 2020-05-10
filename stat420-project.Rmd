@@ -73,6 +73,12 @@ Dow_Jones_Industrial_Average_from_April <- read_csv("Dow Jones Industrial Averag
 ```
 
 This dataset we will use the INTDSRUSM193N columns.
+```{r}
+# price of bitcoin
+Bitcoin <- read_csv("Bitcoin Historical Data - Investing.com.csv")
+Bitcoin$Date = as.Date(Bitcoin$Date, format="%b %d, %Y")
+plot(Price ~ Date, data=Bitcoin)
+```
 
 ```{r}
 Apple_Inc_company_stock <- read_csv("Apple Inc. - company stock.csv")
@@ -82,7 +88,7 @@ This dataset we will use the Adj Close and volume columns.
 
 ```{r}
 Crude_Oil_price <- read_excel("Crude Oil Prices Daily.xlsx")
-Crude_Oil_price$Date = as.Date(Crude_Oil_price$Date, format="%m/%d/%y")
+Crude_Oil_price$Date = as.Date(Crude_Oil_price$Date, format="%m/%d/%Y")
 plot(Closing_Price ~ Date, data=Crude_Oil_price)
 
 Brent_Oil_price <- read_csv("BrentOilPrices.csv")
