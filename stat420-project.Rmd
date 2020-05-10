@@ -59,20 +59,6 @@ library("readxl")
 ```
 
 # data clean
-
-```{r}
-The_interest_rate_for_the_United_States<- read_csv("The interest rate for the United States, from 2008 - 2018.csv")
-plot(Volume ~ Date, data=The_interest_rate_for_the_United_States)
-```
-
-This dataset we will use the Volume and Adj Close columns.
-
-
-```{r}
-Dow_Jones_Industrial_Average_from_April <- read_csv("Dow Jones Industrial Average from April 2008 to April 2018.csv")
-```
-
-This dataset we will use the INTDSRUSM193N columns.
 ```{r}
 # price of bitcoin
 Bitcoin <- read_csv("Bitcoin Historical Data - Investing.com.csv")
@@ -81,8 +67,27 @@ plot(Price ~ Date, data=Bitcoin)
 ```
 
 ```{r}
+The_interest_rate_for_the_United_States<- read_csv("The interest rate for the United States, from 2010 - 2020.csv")
+plot(interest_rate ~ Date, data=The_interest_rate_for_the_United_States)
+```
+
+This dataset we will use the Volume and Adj Close columns.
+
+
+```{r}
+Dow_Jones_Industrial_Average <- read_csv("Dow Jones Industrial Average.csv")
+plot(Adj_Close ~ Date, data=Dow_Jones_Industrial_Average)
+```
+```{r}
+NYSE_Composite_Index <- read_csv("NYSE Composite Index.csv")
+plot(Adj_Close ~ Date, data=NYSE_Composite_Index)
+```
+
+
+```{r}
 Apple_Inc_company_stock <- read_csv("Apple Inc. - company stock.csv")
-plot(Volume ~ Date, data=Apple_Inc_company_stock)
+# plot(Volume ~ Date, data=Apple_Inc_company_stock)
+plot(Adj_Close ~ Date, data=Apple_Inc_company_stock)
 ```
 This dataset we will use the Adj Close and volume columns.
 
