@@ -59,6 +59,7 @@ library(readr)
 library("readxl")
 library(sqldf)
 library(glue)
+options(digits=6)
 ```
 
 # data clean
@@ -86,12 +87,19 @@ plot(interest_rate ~ Date, data=The_interest_rate_for_the_United_States)
 ```{r}
 US_dollar_yuan_exchange_rate <- read_csv("US dollar-yuan exchange rate.csv")
 US_dollar_yuan_exchange_rate$Date = as.Date(US_dollar_yuan_exchange_rate$Date, format="%m/%d/%y")
-plot(Yuan_USD_exchange_rate ~ Date, data = US_dollar_yuan_exchange_rate)
+plot(exchange_rate ~ Date, data = US_dollar_yuan_exchange_rate)
+
+Euro_to_US_exchange_rate <- read_csv("euro-dollar-exchange-rate-historical-chart.csv")
+Euro_to_US_exchange_rate$Date = as.Date(Euro_to_US_exchange_rate$Date, format="%m/%d/%y")
+Euro_to_US_exchange_rate$exchange_rate = 1/Euro_to_US_exchange_rate$exchange_rate
+plot(exchange_rate  ~ Date, data = Euro_to_US_exchange_rate)
 ```
-
-This dataset we will use the Volume and Adj Close columns.
-
-
+```{r}
+Gold <- read_csv("Gold Futures Historical Data.csv")
+Gold$Date = as.Date(Gold$Date, format="%b %d, %Y")
+plot(Price ~ Date, data=Gold)
+```
+This dataset we will use the Volume and Price columns.
 ```{r}
 Dow_Jones_Industrial_Average <- read_csv("Dow Jones Industrial Average Historical Data.csv")
 Dow_Jones_Industrial_Average$Date = as.Date(Dow_Jones_Industrial_Average$Date, format="%b %d, %Y")
@@ -128,32 +136,38 @@ plot(Price ~ Date, data=Brent_Oil_price)
 # Reduce(function(...) merge(..., by="Date"), list(Brent_Oil_price, Crude_Oil_price, Apple_compact))
 sql =  glue("
 select Bitcoin.Date,
-       Bitcoin.Price         as Bitcoin_price,
-       exchange.Yuan_USD_exchange_rate,
-       DJIA.Price            as DJIA_index,
-       NYSE.Price            as NYSE_index,
-       Apple.Price           as Apple_price,
-       Brent_Oil_price.Price as brent_oil_price,
-       WTI_oil_price.Price   as WTI_oil_price,
+       Bitcoin.Price                as Bitcoin_price,
+       exchange_China.exchange_rate as USD_Yuan_exchange_rate,
+       exchange_Euro.exchange_rate  as USD_Euro_Exchange_Rate,
+       DJIA.Price                   as DJIA_index,
+       NYSE.Price                   as NYSE_index,
+       Apple.Price                  as Apple_price,
+       Brent_Oil_price.Price        as brent_oil_price,
+       WTI_oil_price.Price          as WTI_oil_price,
+       Gold.Price                   as Gold_price,
        President.president_code,
        interest.interest_rate,
        Bitcoin.month,
        Bitcoin.year
 from Bitcoin
-         left outer join US_dollar_yuan_exchange_rate as exchange
-                         on exchange.Date = Bitcoin.Date
+         left outer join US_dollar_yuan_exchange_rate as exchange_China
+                         on exchange_China.Date = Bitcoin.Date
+         left outer join Euro_to_US_exchange_rate as exchange_Euro
+                         on exchange_Euro.Date = Bitcoin.Date
          left outer join Dow_Jones_Industrial_Average as DJIA
-                         on DJIA.Date = exchange.Date
+                         on DJIA.Date = Bitcoin.Date
          left outer join NYSE_Composite_Index as NYSE
-                         on NYSE.Date = DJIA.Date
+                         on NYSE.Date = Bitcoin.Date
          left outer join Brent_Oil_price
                          on Brent_Oil_price.Date = Bitcoin.Date
          left outer join WTI_oil_price
                          on WTI_oil_price.Date = Bitcoin.Date
          left outer join Apple_Inc_company_stock as Apple
-                         on Apple.Date = NYSE.Date
+                         on Apple.Date = Bitcoin.Date
          left outer join President
                          on President.Date = Bitcoin.Date
+         left outer join Gold
+                         on Gold.Date = Bitcoin.Date
          left outer join The_interest_rate_for_the_United_States as interest
                          on interest.month = Bitcoin.month
                              and interest.year = Bitcoin.year
