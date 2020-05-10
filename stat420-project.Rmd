@@ -49,14 +49,20 @@ Description of additional data preparation that you performed.
 Description of the process you chose to follow.
 Narrative of your step-by-step decision making process throughout the analysis as you adjusted the model and attempted to validate model assumptions.
 ```{r}
+# install necessary packages
+# install.packages("readxl")
+```
+
+```{r}
 library(readr)
+library("readxl")
 ```
 
 # data clean
 
 ```{r}
 The_interest_rate_for_the_United_States<- read_csv("The interest rate for the United States, from 2008 - 2018.csv")
-plot(Volume ~ Date , data=The_interest_rate_for_the_United_States)
+plot(Volume ~ Date, data=The_interest_rate_for_the_United_States)
 ```
 
 This dataset we will use the Volume and Adj Close columns.
@@ -64,16 +70,25 @@ This dataset we will use the Volume and Adj Close columns.
 
 ```{r}
 Dow_Jones_Industrial_Average_from_April <- read_csv("Dow Jones Industrial Average from April 2008 to April 2018.csv")
-
 ```
+
 This dataset we will use the INTDSRUSM193N columns.
 
 ```{r}
 Apple_Inc_company_stock <- read_csv("Apple Inc. - company stock.csv")
-plot(Volume ~ Date , data=Apple_Inc_company_stock)
+plot(Volume ~ Date, data=Apple_Inc_company_stock)
 ```
 This dataset we will use the Adj Close and volume columns.
 
+```{r}
+Crude_Oil_price <- read_excel("Crude Oil Prices Daily.xlsx")
+Crude_Oil_price$Date = as.Date(Crude_Oil_price$Date, format="%m/%d/%y")
+plot(Closing_Price ~ Date, data=Crude_Oil_price)
+
+Brent_Oil_price <- read_csv("BrentOilPrices.csv")
+Brent_Oil_price$Date = as.Date(Brent_Oil_price$Date, format="%d-%b-%y")
+plot(Price ~ Date, data=Brent_Oil_price)
+```
 
 # Results 
 The results section should contain numerical or graphical summaries of your results. You should report a final model you have chosen. There is not necessarily one, singular correct model, but certainly some methods and models are better than others in certain situations. You may use any methods we studied this semester to complete this task, and provide evidence that your final choice of model is a good one. Some possible items to be discussed:
