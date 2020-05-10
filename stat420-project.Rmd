@@ -205,10 +205,7 @@ library('corrplot') #package corrplot
 corrplot(M, method = "circle")
 ```
 
-```{r}
-btc_lm = lm(Bitcoin_price ~ . ,data=combined_monthly[, -c(3, 5, 7, 9, 11, 12, 13, 14)])
-summary(btc_lm)
-```
+
 ```{r}
 gamble_model = lm(Bitcoin_price~ . ,combined_monthly[, -c(1, 13, 14)])
 gamble_model_back_aic = step(gamble_model, direction = "backward", trace = 0)
@@ -274,7 +271,7 @@ autompg_big_mod = lm(
 summary(autompg_big_mod)
 ```
 ```{r}
-btc_lm = lm(Bitcoin_price ~ USD_Yuan_exchange_rate + USD_Euro_Exchange_Rate + DJIA_index + brent_oil_price + president_code ,data=combined_monthly[, -c(1, 13, 14)])
+model1 = lm(Bitcoin_price ~ USD_Yuan_exchange_rate + USD_Euro_Exchange_Rate + DJIA_index + brent_oil_price + president_code ,data=combined_monthly[, -c(1, 13, 14)])
 summary(btc_lm)
 ```
 
