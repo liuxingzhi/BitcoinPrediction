@@ -192,6 +192,10 @@ combined_monthly
 # Results 
 The results section should contain numerical or graphical summaries of your results. You should report a final model you have chosen. There is not necessarily one, singular correct model, but certainly some methods and models are better than others in certain situations. You may use any methods we studied this semester to complete this task, and provide evidence that your final choice of model is a good one. Some possible items to be discussed:
 
+```{r}
+btc_lm = lm(Bitcoin_price ~ . -Date ,data=combined_monthly[, -c(11:12)])
+summary(btc_lm)
+```
 
 # Discussion
 The discussion section should contain discussion of your results and should frame your results in the context of the data. How is your final model useful?
