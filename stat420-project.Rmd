@@ -275,6 +275,152 @@ model1 = lm(Bitcoin_price ~ USD_Yuan_exchange_rate + USD_Euro_Exchange_Rate + DJ
 summary(btc_lm)
 ```
 
+```{r}
+# data = combined_monthly
+n = 500
+test_size = 250
+trials = 1000
+sigmas = c(1,2,4)
+
+# for gambel model
+# lm(formula = Bitcoin_price ~ USD_Yuan_exchange_rate + USD_Euro_Exchange_Rate + 
+#     DJIA_index + interest_rate + Date_posix, data = combined_monthly[, 
+#     -c(1, 13, 14)])
+# 
+# Coefficients:
+#            (Intercept)  USD_Yuan_exchange_rate  USD_Euro_Exchange_Rate              DJIA_index  
+#             -31191.893               -2878.941              -14470.975                   0.785  
+#          interest_rate              Date_posix  
+#              -1160.888                   2.991  
+beta_0 = -31191.893
+beta_1 = -2878.941
+beta_2 = -14470.975
+beta_3 = 0.785
+beta_4 = -1160.888 
+beta_5 = 2.991
+
+x1 = combined_monthly$USD_Yuan_exchange_rate
+x2 = combined_monthly$USD_Euro_Exchange_Rate
+x3 = combined_monthly$DJIA_index
+x4 = combined_monthly$interest_rate
+x5 = combined_monthly$Date_posix
+
+x6 = combined_monthly$NYSE_index
+x7 = combined_monthly$Apple_price
+x8 = combined_monthly$brent_oil_price
+x9 = combined_monthly$WTI_oil_price
+x10 = combined_monthly$Gold_price
+x11 = combined_monthly$president_code
+
+```
+
+
+```{r}
+# Store train_rmse and test_rmse into two matrixs(1000x11): train_error and test_error for each training and each test.
+
+rmse  = function(actual, predicted) {
+  sqrt(mean((actual - predicted) ^ 2))
+}
+
+simulate_models = function(sigmas,simulation = 1000, dataset = combined_monthly){
+  sample_size = nrow(dataset)
+  train_error = matrix(rep(0,simulation*11), nrow=simulation, ncol=11)
+  test_error = matrix(rep(0,simulation*11), nrow=simulation, ncol=11)
+  for(i in 1:simulation) {
+    # simulate: true models plus errors
+    eps =  rnorm(sample_size, mean = 0 , sd = sigmas)
+    sim_y = beta_0 + beta_1 * combined_monthly$USD_Yuan_exchange_rate + beta_2 * combined_monthly$USD_Euro_Exchange_Rate + beta_3 * combined_monthly$DJIA_index + beta_4 * combined_monthly$interest_rate + beta_5 * combined_monthly$Date_posix + eps
+    
+    sim_data = data.frame(sim_y,x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11)
+    
+    # training: randomly chosen observations
+     train_index = sample(1:nrow(sim_data), sample_size/2) 
+     experiment_data  = sim_data[train_index, ]
+     test_data   = sim_data[-train_index, ]
+      fit1 = lm(sim_y ~ x1, data = experiment_data)
+      fit2 = lm(sim_y ~ x1+x2, data = experiment_data)
+      fit3 = lm(sim_y ~ x1+x2+x3, data = experiment_data)
+      fit4 = lm(sim_y ~ x1+x2+x3+x4, data = experiment_data)
+      fit5 = lm(sim_y ~ x1+x2+x3+x4+x5, data = experiment_data)
+      fit6 = lm(sim_y ~ x1+x2+x3+x4+x5+x6, data = experiment_data)
+      fit7 = lm(sim_y ~ x1+x2+x3+x4+x5+x6+x7, data = experiment_data)
+      fit8 = lm(sim_y ~ x1+x2+x3+x4+x5+x6+x7+x8, data = experiment_data)
+      fit9 = lm(sim_y ~ x1+x2+x3+x4+x5+x6+x7+x8+x9, data = experiment_data)
+      fit10 = lm(sim_y ~ x1+x2+x3+x4+x5+x6+x7+x8+x9+x10, data = experiment_data)
+      fit11 = lm(sim_y ~ x1+x2+x3+x4+x5+x6+x7+x8+x9+x10+x11, data = experiment_data)
+    
+    train_error[i,] = c(
+      rmse(experiment_data$sim_y, predict(fit1, experiment_data)),
+      rmse(experiment_data$sim_y, predict(fit2, experiment_data)),
+      rmse(experiment_data$sim_y, predict(fit3, experiment_data)),
+      rmse(experiment_data$sim_y, predict(fit4, experiment_data)),
+      rmse(experiment_data$sim_y, predict(fit5, experiment_data)),
+      rmse(experiment_data$sim_y, predict(fit6, experiment_data)),
+      rmse(experiment_data$sim_y, predict(fit7, experiment_data)),
+      rmse(experiment_data$sim_y, predict(fit8, experiment_data)),
+      rmse(experiment_data$sim_y, predict(fit9, experiment_data)),
+      rmse(experiment_data$sim_y, predict(fit10, experiment_data)),
+      rmse(experiment_data$sim_y, predict(fit11, experiment_data))
+    )
+    
+    test_error[i,] = c(
+      rmse(test_data$sim_y, predict(fit1, test_data)),
+      rmse(test_data$sim_y, predict(fit2, test_data)),
+      rmse(test_data$sim_y, predict(fit3, test_data)),
+      rmse(test_data$sim_y, predict(fit4, test_data)),
+      rmse(test_data$sim_y, predict(fit5, test_data)),
+      rmse(test_data$sim_y, predict(fit6, test_data)),
+      rmse(test_data$sim_y, predict(fit7, test_data)),
+      rmse(test_data$sim_y, predict(fit8, test_data)),
+      rmse(test_data$sim_y, predict(fit9, test_data)),
+      rmse(test_data$sim_y, predict(fit10, test_data)),
+       rmse(test_data$sim_y, predict(fit11, test_data))
+    )
+ }
+ result_final = list("train_error" = train_error, "test_error" = test_error)
+ result_final
+}
+
+```
+
+Finally, we apply different sigmas:
+
+```{r}
+re1 = simulate_models(sigmas = 1,simulation = 100, dataset = combined_monthly)
+re2 = simulate_models(sigmas = 2,simulation = 100, dataset = combined_monthly)
+re3 = simulate_models(sigmas = 4,simulation = 100, dataset = combined_monthly)
+```
+
+
+```{r}
+library("plyr")
+library("knitr")
+opts_chunk$set(fig.show = "hold")
+```
+
+```{r}
+rmse_train_sig1_means = colMeans(re1$train_error)
+rmse_train_sig2_means = colMeans(re2$train_error)
+rmse_train_sig4_means = colMeans(re3$train_error)
+rmse_test_sig1_means = colMeans(re1$test_error)
+rmse_test_sig2_means = colMeans(re2$test_error)
+rmse_test_sig4_means = colMeans(re3$test_error)
+```
+
+
+
+```{r}
+plot(Bitcoin_price ~ ., data = combined_monthly[, -c(1, 
+    13, 14)], col = "grey", pch = 20, cex = 1.5,
+     main = "Bitcoin_price vs possible parameters")
+```
+
+```{r}
+par(mfrow = c(2,2))
+plot(gamble_model, pch = 20)
+```
+
+
 
 # Discussion
 The discussion section should contain discussion of your results and should frame your results in the context of the data. How is your final model useful?
