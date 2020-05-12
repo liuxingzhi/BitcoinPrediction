@@ -1,6 +1,6 @@
 ---
 title: "STAT 420-finalproject"
-author: "Siyu Niu Han Jiang Xinyi Peng Xingzhi Liu"
+author: "Siyu Niu, Han Jiang, Xinyi Peng, Xingzhi Liu"
 date: "2020/5"
 output: html_document
 ---
@@ -11,6 +11,9 @@ output: html_document
 options(scipen = 1, digits = 4, width = 80)
 library(knitr)
 opts_chunk$set(cache = TRUE, autodep = TRUE)
+# knitr::opts_chunk$set(message = FALSE)
+defaultW <- getOption("warn") 
+options(warn = -1) 
 ```
 
 
@@ -65,6 +68,7 @@ library(caret)
 library(leaps)
 library(MASS)
 options(digits=6)
+options(warn=-1)
 ```
 
 # data clean
@@ -220,8 +224,8 @@ combined_weekdays = combined_weekdays[!(names(combined_weekdays) %in% c("month")
 ## Testing
 Bitcoin did not become popularly traded until 2014, therefore we will use all data from 2014 to 2020 because Bitcoin does not really count as a financial product before 2014. Data before 2014 are ignored. \
 In order to test the effectiveness of our model, we randomly select half of the observations as our training dataset and the other half as our testing datasets. \
-```{r}
-# data = combined_monthly
+```{r messages=FALSE, warnings=FALSE}
+data = combined_weekdays
 trn_idx = sample(nrow(data), nrow(data) / 2)
 monthly_train = combined_monthly[trn_idx, ]
 monthly_test = combined_monthly[-trn_idx, ]
@@ -232,7 +236,7 @@ train_data = weekday_train
 ```
 
 Helper functions \
-```{r}
+```{r messages=FALSE, warnings=FALSE}
 model_names = c()
 model_params_num = c()
 model_rss = c()
@@ -240,10 +244,10 @@ model_adjr2 = c()
 model_rmse = c()
 test_rmse = c()
 
-store_result = function(model){
+store_result = function(model, model_name, log = FALSE){
   model = model
-  rmses = calc_rmse(model, data, trn_idx)
-  model_names <<- c(model_names, deparse(substitute(model)))
+  rmses = calc_rmse(model, data, trn_idx, log)
+  model_names <<- c(model_names, model_name)
   model_params_num <<- c(model_params_num, length(coefficients(model)))
   model_rss <<- c(model_rss, deviance(model))
   model_adjr2 <<- c(model_adjr2, summary(model)$adj.r)
@@ -251,15 +255,21 @@ store_result = function(model){
   test_rmse <<- c(test_rmse, rmses[2])
 }
 
-calc_rmse = function(model, data, trn_idx) {
+calc_rmse = function(model, data, trn_idx, log = FALSE) {
   data_train = data[trn_idx, ]
   data_test = data[-trn_idx, ]
-
   pred = predict(model, data_train)
+  if(log){
+    pred = exp(pred)
+  }
+ 
   actual = data_train$Bitcoin_price
   train_rmse = sqrt(mean((pred - actual)^2))
 
   pred = predict(model, data_test)
+  if(log){
+    pred = exp(pred)
+  }
   actual = data_test$Bitcoin_price
   test_rmse = sqrt(mean((pred - actual)^2))
   c(train_rmse, test_rmse)
@@ -307,12 +317,12 @@ Our potential predictors of Bitcoin price are
 - Year (Categorical variable) World situation may change every year. Bitcoin price is also affected by black swan events, or pandemic like what we are having now.
 
 We’ll use the pairs() plot to determine which variables may benefit from a quadratic or logarithm relationship with the response.
-```{r}
+```{r messages=FALSE, warnings=FALSE}
 pairs(data[!(names(data) %in% c("Date", "month","year"))], col = "dodgerblue")
 ```
 
 Next, we will use the boxcox() function to find the best transformation of the form considered by the Box-Cox method.
-```{r}
+```{r messages=FALSE, warnings=FALSE}
 model = lm(Bitcoin_price ~ . ,data=combined_monthly)
 boxcox(model,
        lambda = seq(-0.5, 0.5, by = 0.005),
@@ -321,7 +331,7 @@ boxcox(model,
 we see a very high log likelihood when λ is from about -0.3 to 0.1, which recommends a transformation of log transformation. \
 
 In additional to pair plot, we use a correlation matrix to find all possible interaction between each of our predictors.
-```{r}
+```{r messages=FALSE, warnings=FALSE}
 # find correlation between all of these predictors
 log_transform = combined_monthly
 log_transform$Transaction_volume = log(log_transform$Transaction_volume)
@@ -341,10 +351,10 @@ The results section should contain numerical or graphical summaries of your resu
 
 ## Simplest model, Multiple Regression
 Let's first use a full_mlr_model as a starting point. It is not a good model, but we will try to improve this model using parameter transformation, variable selection and model building techniques
-```{r}
+```{r messages=FALSE, warnings=FALSE}
 full_mlr_model = lm(Bitcoin_price ~ ., train_data[!(names(data) %in% c("Date", "month"))])
 plots_model(full_mlr_model)
-store_result(full_mlr_model)
+store_result(full_mlr_model, "full_mlr_model")
 ```
 As shown by the above two graph, the variance is not constant, the linearly is also violated. And according to Q-Q plot, Normality of error is violated, too. \
 We need to find better models. \
@@ -353,7 +363,7 @@ We need to find better models. \
 Therefore, we will re-select our predictors using regsubsets().\
 Because there are exetremely values and peaks in Bitcoin price, We will consider adding quadratic terms to better captures the Bitcoin_price trends. \
 Since the number of parameters is not too many, we will use a comprehensive search to find the most significant models by calling regsubsets. \
-```{r}
+```{r messages=FALSE, warnings=FALSE}
 library(leaps)
 exhaustive_search = summary(regsubsets(Bitcoin_price ~ Transaction_volume + USD_Yuan_exchange_rate + USD_Euro_Exchange_Rate + DJIA_index + NYSE_index + brent_oil_price + WTI_oil_price + Gold_price + president_code + interest_rate + Date_posix + I(Transaction_volume^2) + I(Date_posix ^ 2) + I(USD_Yuan_exchange_rate ^ 2) + I(USD_Euro_Exchange_Rate ^ 2) + I(DJIA_index ^ 2)  + I(NYSE_index ^ 2) + I(brent_oil_price ^ 2) + I(WTI_oil_price ^ 2) + I(Gold_price ^ 2) + I(interest_rate ^ 2), data = data[!(names(data) %in% c("Date", "month"))], nvmax=8))
 # exhaustive_search$which
@@ -361,7 +371,7 @@ p = length(coef(exhaustive_search))
 n = length(resid(exhaustive_search))
 ```
 We will limit up to 9 of the most significant predictors in our model. If we look at the RSS and Adjusted R-squared, we will also find that RSS and Adjusted R-sqaured are getting better as we increase our number of predictors until nine. 
-```{r}
+```{r messages=FALSE, warnings=FALSE}
 exhaustive_search$rss
 exhaustive_search$adjr2
 (best_r2_ind = which.max(exhaustive_search$adjr2))
@@ -369,60 +379,92 @@ exhaustive_search$which[best_r2_ind, ]
 ```
 
 Based on the results of comprehensive search, we have an exhaustive_search_model model.
-```{r}
+```{r messages=FALSE, warnings=FALSE}
 exhaustive_search_model = lm(Bitcoin_price ~ Transaction_volume + DJIA_index + NYSE_index + Date_posix + I(Date_posix^2) + I(USD_Yuan_exchange_rate^2) + I(USD_Euro_Exchange_Rate^2) + I(DJIA_index^2) + I(NYSE_index^2),  data = train_data)
 plots_model(exhaustive_search_model)
-store_result(exhaustive_search_model)
+store_result(exhaustive_search_model, "exhaustive_search_model")
 ```
 Unfortunately, linearity and constant variance is still violated. Therefore, we will using logarithm as a variance stabilizing transformation
 
 ## Logarithmic transformation and Interaction terms
-```{r}
-log_full_interaction_model = lm(log(Bitcoin_price) ~ (. ^ 2) ,  data = train_data)
+```{r messages=FALSE, warnings=FALSE}
+log_model = lm(log(Bitcoin_price) ~ . ,  data = train_data, log = TRUE)
+store_result(exhaustive_search_model, "log_model")
+
+log_full_interaction_model = lm(log(Bitcoin_price) ~ (. ^ 2) ,  data = train_data, log = TRUE)
 plots_model(log_full_interaction_model)
-store_result(log_full_interaction_model)
+store_result(exhaustive_search_model, "log_full_interaction_model")
 ```
 After doing log transformation and adding interaction, The mean of the residuals is around not zero therefore linearity is perserved. \
 Equal Variance also seems to be preserved because the the variance looks constant. From the Q-Q plot, the distribution of looks much better than previous models. But the normality of error is still violated at extreme values. \
-```{r}
+```{r messages=FALSE, warnings=FALSE}
 plot_prediction(log_full_interaction_model, data, trn_idx, log = TRUE)
 ```
 
 ## Stepwise model selection
 Since we just add all interaction terms into our model, it looks like we have a overfitting when around year 2017. Besides, we would like to reduce the number of predictors to simplify our model. 
-```{r}
-log_interaction_reduced_model = lm(log(Bitcoin_price) ~ (. ^ 2) ,  data = train_data)
-n = length(resid(log_interaction_reduced_model))
-log_int_mod_back_bic = step(log_interaction_reduced_model, direction = "backward", k = log(n), trace = 0)
-log_int_mod_back_aic = step(log_interaction_reduced_model, direction = "backward", step=0)
+```{r messages=FALSE, warnings=FALSE}
+n = length(resid(log_full_interaction_model))
+log_full_int_mod_back_bic = step(log_full_interaction_model, direction = "backward", k = log(n), trace = 0)
+log_full_int_mod_back_aic = step(log_full_interaction_model, direction = "backward", step=0)
 ```
 
+```{r messages=FALSE, warnings=FALSE}
+log_interaction_only_year = lm(log(Bitcoin_price) ~ (. * year) ,  data = train_data)
+n = length(resid(log_interaction_only_year))
 
-## Removing influencial points
+log_groupby_year_back_bic = step(log_interaction_only_year, direction = "backward", k = log(n), trace = 0)
+store_result(log_groupby_year_back_bic, "log_groupby_year_back_bic", log = TRUE)
+log_groupby_year_back_aic = step(log_interaction_only_year, direction = "backward", step=0)
+store_result(log_groupby_year_back_aic, "log_groupby_year_back_aic", log = TRUE)
+```
+
+## Removing influencial points and alternative models
 We will use Cook’s Distance to calculate influential points. \
-```{r}
-cooksdistance = cooks.distance(log_int_mod_back_bic)
-log_int_mod_back_bic_fix = lm(log_int_mod_back_bic,
+```{r messages=FALSE, warnings=FALSE}
+cooksdistance = cooks.distance(log_groupby_year_back_bic)
+log_groupby_year_back_bic_fix = lm(log_groupby_year_back_bic,
+                   data = data,
+                   subset = cooksdistance < 4 / length(cooksdistance))
+plot_prediction(log_groupby_year_back_bic_fix, data, trn_idx, log = TRUE)
+store_result(log_groupby_year_back_bic_fix, "log_groupby_year_back_bic_fix", log = TRUE)
+```
+
+```{r messages=FALSE, warnings=FALSE}
+cooksdistance = cooks.distance(log_groupby_year_back_aic)
+log_groupby_year_back_aic_fix = lm(log_groupby_year_back_aic,
+                   data = data,
+                   subset = cooksdistance < 4 / length(cooksdistance))
+plot_prediction(log_groupby_year_back_aic_fix, data, trn_idx, log = TRUE)
+store_result(log_groupby_year_back_aic_fix, "log_groupby_year_back_aic_fix", log = TRUE)
+```
+
+```{r messages=FALSE, warnings=FALSE}
+cooksdistance = cooks.distance(log_full_int_mod_back_bic)
+log_int_mod_back_bic_fix = lm(log_full_int_mod_back_bic,
                    data = data,
                    subset = cooksdistance < 4 / length(cooksdistance))
 plots_model(log_int_mod_back_bic_fix)
 plot_prediction(log_int_mod_back_bic_fix, data, trn_idx, log = TRUE)
-store_result(log_int_mod_back_bic_fix)
+store_result(log_int_mod_back_bic_fix, "log_int_mod_back_bic_fix", log = TRUE)
 ```
-```{r}
+```{r messages=FALSE, warnings=FALSE}
 
-cooksdistance = cooks.distance(log_int_mod_back_aic)
-log_int_mod_back_aic_fix = lm(log_int_mod_back_aic,
+cooksdistance = cooks.distance(log_full_int_mod_back_aic)
+log_int_mod_back_aic_fix = lm(log_full_int_mod_back_aic,
                    data = data,
                    subset = cooksdistance < 4 / length(cooksdistance))
 plots_model(log_int_mod_back_aic_fix)
 plot_prediction(log_int_mod_back_aic_fix, data, trn_idx, log = TRUE)
-store_result(log_int_mod_back_aic_fix)
+store_result(log_int_mod_back_aic_fix, "log_int_mod_back_aic_fix", log = TRUE)
 ```
 
-```{r}
-model_list <- data.frame("model names"=model_names, "num of parameters" = model_params_num, "model_rss" = model_rss, "model_adjr2" = model_adjr2, "model_rmse"=model_rmse, "test_rmse"=test_rmse)
-model_lists
+```{r warnings=FALSE}
+model_list <- data.frame("model names"=model_names, "num of parameters" = model_params_num, "model_adjr2" = model_adjr2, "model_rmse"=model_rmse, "test_rmse"=test_rmse)
+
+knitr::kable(model_list, digits = getOption("digits"), row.names = NA,
+  col.names = colnames(model_list), align = "c", caption = NULL, label = NULL,
+  format.args = list(), escape = TRUE)
 ```
 
 
