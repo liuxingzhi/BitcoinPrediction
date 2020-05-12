@@ -61,6 +61,9 @@ library("readxl")
 library(sqldf)
 library(glue)
 library("corrplot")
+library(caret)
+library(leaps)
+library(MASS)
 options(digits=6)
 ```
 
@@ -73,6 +76,10 @@ Bitcoin$month <- strftime(Bitcoin$Date, "%m")
 Bitcoin$year <- strftime(Bitcoin$Date, "%Y")
 plot(Price ~ Date, data=Bitcoin, type = "l")
 ```
+```{r}
+plot(Volume ~ Date, data=Bitcoin, type = "l")
+```
+
 ```{r}
 President <- read_csv("President.csv")
 President$Date = as.Date(President$Date, format="%b %d, %Y")
@@ -114,18 +121,14 @@ plot(Price ~ Date, data=NYSE_Composite_Index, type = 'l')
 ```
 
 
-```{r}
-Apple_Inc_company_stock <- read_csv("AAPL Historical Data.csv")
-Apple_Inc_company_stock$Date = as.Date(Apple_Inc_company_stock$Date, format="%b %d, %Y")
-plot(Price ~ Date, data=Apple_Inc_company_stock, type = 'l')
-```
+
 This dataset we will use the Adj Close and volume columns.
 
 ```{r}
 WTI_oil_price <- read_csv("Crude Oil WTI Futures Historical Data.csv")
 WTI_oil_price$Date = as.Date(WTI_oil_price$Date, format="%b %d, %Y")
 # colnames(WTI_oil_price)[2] <- "WTI_oil_price"
-plot(Price ~ Date, data=WTI_oil_price)
+plot(Price ~ Date, data=WTI_oil_price, type = 'l')
 
 Brent_Oil_price <- read_csv("Brent Oil Futures Historical Data.csv")
 Brent_Oil_price$Date = as.Date(Brent_Oil_price$Date, format="%b %d, %Y")
@@ -133,17 +136,18 @@ Brent_Oil_price$Date = as.Date(Brent_Oil_price$Date, format="%b %d, %Y")
 plot(Price ~ Date, data=Brent_Oil_price, type = 'l')
 ```
 
+## Data Cleaning and preparing
+combine all those csv to a one giant dataframe \
+Because we are using gold price, stock price, oil price, etc to predict Bitcoin price, it's reasonable to expect a few days delay for the Bitcoin price to reflect what happen in stock and futures markets. For this model, we set the reponse time for Bitcoin price to 15 days, which assumes that Bitcoin price will react about 15 days later than the gold price, stock price, oil price, etc changed.
 ```{r}
-# combine
-# Reduce(function(...) merge(..., by="Date"), list(Brent_Oil_price, Crude_Oil_price, Apple_compact))
 sql =  glue("
 select Bitcoin.Date,
        Bitcoin.Price                as Bitcoin_price,
+       Bitcoin.Volume               as Transaction_volume,
        exchange_China.exchange_rate as USD_Yuan_exchange_rate,
        exchange_Euro.exchange_rate  as USD_Euro_Exchange_Rate,
        DJIA.Price                   as DJIA_index,
        NYSE.Price                   as NYSE_index,
-       Apple.Price                  as Apple_price,
        Brent_Oil_price.Price        as brent_oil_price,
        WTI_oil_price.Price          as WTI_oil_price,
        Gold.Price                   as Gold_price,
@@ -153,169 +157,115 @@ select Bitcoin.Date,
        Bitcoin.year
 from Bitcoin
          left outer join US_dollar_yuan_exchange_rate as exchange_China
-                         on exchange_China.Date = Bitcoin.Date
+                         on exchange_China.Date = Bitcoin.Date - 15
          left outer join Euro_to_US_exchange_rate as exchange_Euro
-                         on exchange_Euro.Date = Bitcoin.Date
+                         on exchange_Euro.Date = Bitcoin.Date - 15
          left outer join Dow_Jones_Industrial_Average as DJIA
-                         on DJIA.Date = Bitcoin.Date
+                         on DJIA.Date = Bitcoin.Date - 15
          left outer join NYSE_Composite_Index as NYSE
-                         on NYSE.Date = Bitcoin.Date
+                         on NYSE.Date = Bitcoin.Date - 15
          left outer join Brent_Oil_price
-                         on Brent_Oil_price.Date = Bitcoin.Date
+                         on Brent_Oil_price.Date = Bitcoin.Date - 15
          left outer join WTI_oil_price
-                         on WTI_oil_price.Date = Bitcoin.Date
-         left outer join Apple_Inc_company_stock as Apple
-                         on Apple.Date = Bitcoin.Date
+                         on WTI_oil_price.Date = Bitcoin.Date - 15
          left outer join President
-                         on President.Date = Bitcoin.Date
+                         on President.Date = Bitcoin.Date - 15
          left outer join Gold
-                         on Gold.Date = Bitcoin.Date
+                         on Gold.Date = Bitcoin.Date - 15
          left outer join The_interest_rate_for_the_United_States as interest
                          on interest.month = Bitcoin.month
                              and interest.year = Bitcoin.year
-where Bitcoin.Date between {c (1.0, as.Date('2014-09-01'))[2]} and {c (1.0, as.Date('2020-04-30'))[2]}
-order by Bitcoin.Date desc")
+where Bitcoin.Date between {c (1.0, as.Date('2014-06-01'))[2]} and {c (1.0, as.Date('2020-04-30'))[2]}
+order by Bitcoin.Date asc")
 combined_daily = sqldf(sql)
 combined_daily$Date_posix = c(1, as.Date(combined_daily$Date))[-c(1)]
-
+combined_daily$president_code = as.factor(combined_daily$president_code)
 combined_weekdays = na.omit(combined_daily)
+monthly_volume_df = sqldf("
+select month, year, sum(combined_daily.Transaction_volume) as Transaction_volume
+       from combined_daily
+       group by combined_daily.month, combined_daily.year")
+
 combined_monthly = sqldf("
-select *
-from combined_daily
-where combined_daily.Date in
+select Date,
+       Bitcoin_price,
+       monthly_volume_df.Transaction_volume,
+       USD_Yuan_exchange_rate,
+       USD_Euro_Exchange_Rate,
+       DJIA_index,
+       NYSE_index,
+       brent_oil_price,
+       WTI_oil_price,
+       Gold_price,
+       president_code,
+       interest_rate,
+       Date_posix,
+       combined_weekdays.year
+from combined_weekdays
+join monthly_volume_df
+on monthly_volume_df.month = combined_weekdays.month
+and monthly_volume_df.year = combined_weekdays.year
+where combined_weekdays.Date in
       (select max(combined_weekdays.Date)
        from combined_weekdays
        group by combined_weekdays.month, combined_weekdays.year)
 ")
-combined_monthly
-```
-```{r}
-str(combined_monthly[, -c(1, 13, 14)])
-```
 
-
-
-# Results 
-The results section should contain numerical or graphical summaries of your results. You should report a final model you have chosen. There is not necessarily one, singular correct model, but certainly some methods and models are better than others in certain situations. You may use any methods we studied this semester to complete this task, and provide evidence that your final choice of model is a good one. Some possible items to be discussed:
-```{r}
-combined_monthly = na.omit(combined_monthly)
-M <- cor(x=combined_monthly[, -c(1, 13, 14)], use = "everything", method="pearson") # get correlations
-M
-library('corrplot') #package corrplot
-corrplot(M, method = "circle")
+combined_weekdays = combined_weekdays[!(names(combined_weekdays) %in% c("month"))]
+# combined_monthly
+# plot(combined_monthly$Date, combined_monthly$Bitcoin_price, type = "l", col = "blue")
 ```
 
 
+## Testing
+Bitcoin did not become popularly traded until 2014, therefore we will use all data from 2014 to 2020 because Bitcoin does not really count as a financial product before 2014. Data before 2014 are ignored. \
+In order to test the effectiveness of our model, we randomly select half of the observations as our training dataset and the other half as our testing datasets. \
 ```{r}
-gamble_model = lm(Bitcoin_price~ . ,combined_monthly[, -c(1, 13, 14)])
-gamble_model_back_aic = step(gamble_model, direction = "backward", trace = 0)
-gamble_model_back_aic
-```
-```{r}
-library(leaps)
-all_hipcenter_mod = summary(regsubsets(Bitcoin_price ~ ., data = combined_monthly[, -c(1, 13, 14)]))
-all_hipcenter_mod
-```
-```{r}
-all_hipcenter_mod$which
-all_hipcenter_mod$rss
-all_hipcenter_mod$adjr2
-```
-```{r}
-pairs(combined_monthly[, -c(1, 13, 14)], col = "dodgerblue")
+# data = combined_monthly
+trn_idx = sample(nrow(data), nrow(data) / 2)
+monthly_train = combined_monthly[trn_idx, ]
+monthly_test = combined_monthly[-trn_idx, ]
+weekday_train = combined_weekdays[trn_idx, ]
+weekday_test = combined_weekdays[-trn_idx, ]
+train_data = weekday_train
+# train_data = monthly_train
 ```
 
+Helper functions \
 ```{r}
-# Date USD_Yuan_exchange_rate USD_Euro_Exchange_Rate DJIA_index NYSE_index Apple_price brent_oil_price WTI_oil_price Gold_price president_code interest_rate
-# autompg_big_mod = lm(
-#   log(Bitcoin_price) ~ . ^ 2 + I(disp ^ 2) + I(hp ^ 2) + I(wt ^ 2) + I(acc ^ 2), 
-#   data = combined_monthly[, -c(13, 14)])
-autompg_big_mod = lm(
-  log(Bitcoin_price) ~ . ^ 2, 
-  data = combined_monthly[, -c(1, 13, 14)])
-all_hipcenter_mod = summary(regsubsets(log(Bitcoin_price) ~ ., data = combined_monthly[, -c(1, 13, 14, 15)]))
-# autompg_mod_back_aic = step(autompg_big_mod, direction = "backward", trace = 0)
-# autompg_mod_back_aic
-all_hipcenter_mod
-all_hipcenter_mod$which
-all_hipcenter_mod$rss
-all_hipcenter_mod$adjr2
-```
-```{r}
-# autompg_big_mod = lm(
-#   log(Bitcoin_price) ~ . ^ 2 + I(Date_posix ^ 2) + I(USD_Yuan_exchange_rate ^ 2) + I(USD_Euro_Exchange_Rate ^ 2) + I(DJIA_index ^ 2) +  + I(NYSE_index ^ 2) +  + I(Apple_price ^ 2) +  + I(brent_oil_price ^ 2) +  + I(WTI_oil_price ^ 2) + I(Gold_price ^ 2) + I(president_code ^ 2) + I(interest_rate ^ 2), 
-#   data = combined_monthly[, -c(1, 13, 14)])
-# length(coef(autompg_big_mod))
+model_names = c()
+model_params_num = c()
+model_rss = c()
+model_adjr2 = c()
+model_rmse = c()
+test_rmse = c()
 
-autompg_big_mod = lm(
-  Bitcoin_price ~ . + I(Date_posix ^ 2) + I(USD_Yuan_exchange_rate ^ 2) + I(USD_Euro_Exchange_Rate ^ 2) + I(DJIA_index ^ 2) +  + I(NYSE_index ^ 2) +  + I(Apple_price ^ 2) +  + I(brent_oil_price ^ 2) +  + I(WTI_oil_price ^ 2) + I(Gold_price ^ 2) + I(president_code ^ 2) + I(interest_rate ^ 2), 
-  data = combined_monthly[, -c(1, 13, 14)])
-length(coef(autompg_big_mod))
+store_result = function(model){
+  model = model
+  rmses = calc_rmse(model, data, trn_idx)
+  model_names <<- c(model_names, deparse(substitute(model)))
+  model_params_num <<- c(model_params_num, length(coefficients(model)))
+  model_rss <<- c(model_rss, deviance(model))
+  model_adjr2 <<- c(model_adjr2, summary(model)$adj.r)
+  model_rmse <<- c(model_rmse, rmses[1])
+  test_rmse <<- c(test_rmse, rmses[2])
+}
 
-# autompg_mod_back_aic = step(autompg_big_mod, direction = "backward", trace = 0)
-# autompg_mod_back_aic
-
-n = length(resid(autompg_big_mod))
-autompg_mod_back_aic = step(autompg_big_mod, direction = "backward", trace = 0)
-length(coef(autompg_mod_back_aic))
-autompg_mod_back_aic
-autompg_mod_back_bic = step(autompg_big_mod, direction = "backward", 
-                            k = log(n), trace = 0)
-length(coef(autompg_mod_back_bic))
-autompg_mod_back_bic
-
-btc_lm = lm(Bitcoin_price ~ . ,data=combined_monthly[, -c(1, 13, 14)])
-autompg_big_mod = lm(
-  Bitcoin_price ~ Date_posix + USD_Yuan_exchange_rate +  USD_Euro_Exchange_Rate + DJIA_index + NYSE_index + Apple_price +  I(Date_posix ^ 2) + brent_oil_price + Gold_price + WTI_oil_price +president_code +  interest_rate + I(USD_Yuan_exchange_rate ^ 2) + I(USD_Euro_Exchange_Rate ^ 2) + I(DJIA_index ^ 2) +  + I(NYSE_index ^ 2) +  + I(Apple_price ^ 2) +  + I(brent_oil_price ^ 2) +  + I(WTI_oil_price ^ 2) + I(Gold_price ^ 2) + I(president_code ^ 2) + I(interest_rate ^ 2), 
-  data = combined_monthly[, -c(1, 13, 14)])
-summary(autompg_big_mod)
-```
-```{r}
-model1 = lm(Bitcoin_price ~ USD_Yuan_exchange_rate + USD_Euro_Exchange_Rate + DJIA_index + brent_oil_price + president_code ,data=combined_monthly[, -c(1, 13, 14)])
-summary(btc_lm)
-```
-
-## Building the Model 
-### Splitting up the data - Training/Testing
-```{r}
-#This breaks up the data into a training and testing set.  The training set will include `r nrow(data_trn)` rows of data, while
-data = combined_monthly
-trn_idx = sample(nrow(data),nrow(data)/2)
-data_train = data[trn_idx, ]
-data_test = data[-trn_idx, ]
-```
-
-### Additive Model and Testing Assumptions
-```{r}
-calc_rmse = function(model = gamble_model, data = combined_monthly) {
-  trn_idx = sample(nrow(data),nrow(data)/2)
+calc_rmse = function(model, data, trn_idx) {
   data_train = data[trn_idx, ]
   data_test = data[-trn_idx, ]
-  
+
   pred = predict(model, data_train)
   actual = data_train$Bitcoin_price
   train_rmse = sqrt(mean((pred - actual)^2))
-  
+
   pred = predict(model, data_test)
   actual = data_test$Bitcoin_price
   test_rmse = sqrt(mean((pred - actual)^2))
-
-  c(train_rmse,test_rmse)
+  c(train_rmse, test_rmse)
 }
 
-```
-
-```{r}
-calc_rmse(model = gamble_model, data)
-```
-
-```{r}
-calc_rmse(model = autompg_big_mod, data)
-```
-
-```{r}
-
-plots_model = function(model = gamble_model){
+plots_model = function(model){
   par(mfrow = c(1, 2))
   plot(fitted(model), resid(model), col = "grey", pch = 20,
   xlab = "Fitted", ylab = "Residuals", main = "Fitted vs Residuals")
@@ -324,14 +274,156 @@ plots_model = function(model = gamble_model){
   qqline(resid(model), col = "dodgerblue", lwd = 2)
 }
 
+plot_prediction = function(model, data, trn_idx, log=FALSE) {
+  par(mfrow = c(1, 1))
+  data_test = data[-trn_idx, ]
+  pred = predict(model, data)
+  if(log){
+    pred = exp(pred)
+  }
+
+  plot(data$Date, data$Bitcoin_price, type = "l", col = "blue")
+  points(data$Date, pred, type = "l", col = "green")
+  title(main = deparse(substitute(model)))
+  legend("topleft", 
+         legend=c("Actually", "Predicted"), 
+         col=c("blue", "green"), lty=1:1, cex=0.8, 
+         text.font=4, bg='antiquewhite')
+}
+```
+
+Our potential predictors of Bitcoin price are
+- Transaction Volume
+- US Chinese Yuan exchange rate
+- US European Dollar exhcange rate
+- NYSE Composite Index
+- Dow Jones Industrial Average
+- Brent Oil futures
+- WTI Oil futures
+- Gold futures
+- President terms (Dummy Variable)
+- Federal Interest rates
+- Date time (Every 210,000 blocks mined, or about every four years, the reward given to Bitcoin miners for processing transactions is cut in half) Therefore, theoretically Bitcoin will increase its value as time passes by.
+- Year (Categorical variable) World situation may change every year. Bitcoin price is also affected by black swan events, or pandemic like what we are having now.
+
+We’ll use the pairs() plot to determine which variables may benefit from a quadratic or logarithm relationship with the response.
+```{r}
+pairs(data[!(names(data) %in% c("Date", "month","year"))], col = "dodgerblue")
+```
+
+Next, we will use the boxcox() function to find the best transformation of the form considered by the Box-Cox method.
+```{r}
+model = lm(Bitcoin_price ~ . ,data=combined_monthly)
+boxcox(model,
+       lambda = seq(-0.5, 0.5, by = 0.005),
+       plotit = TRUE)
+```
+we see a very high log likelihood when λ is from about -0.3 to 0.1, which recommends a transformation of log transformation. \
+
+In additional to pair plot, we use a correlation matrix to find all possible interaction between each of our predictors.
+```{r}
+# find correlation between all of these predictors
+log_transform = combined_monthly
+log_transform$Transaction_volume = log(log_transform$Transaction_volume)
+M <- cor(x=log_transform[!(names(log_transform) %in% c("Date", "month","year", "president_code"))], use = "everything", method="pearson") # get correlations
+# M
+library('corrplot') #package corrplot
+corrplot(M, method = "circle")
+```
+It seems that Transaction volume, DJIA_index, NYSE_index and president term, interest rate and Date time has a positive relationship with Bitcoin price. We are going to pay more attention to these predictors. \
+Meanwhile, NYSE Composite Index and Dow Jones Industrial Average are high correlated to each other. SO are the Brent oil futures and WTI oil futures. These intercorrelation might be harmful to our model. \
+
+
+
+
+# Results 
+The results section should contain numerical or graphical summaries of your results. You should report a final model you have chosen. There is not necessarily one, singular correct model, but certainly some methods and models are better than others in certain situations. You may use any methods we studied this semester to complete this task, and provide evidence that your final choice of model is a good one. Some possible items to be discussed:
+
+## Simplest model, Multiple Regression
+Let's first use a full_mlr_model as a starting point. It is not a good model, but we will try to improve this model using parameter transformation, variable selection and model building techniques
+```{r}
+full_mlr_model = lm(Bitcoin_price ~ ., train_data[!(names(data) %in% c("Date", "month"))])
+plots_model(full_mlr_model)
+store_result(full_mlr_model)
+```
+As shown by the above two graph, the variance is not constant, the linearly is also violated. And according to Q-Q plot, Normality of error is violated, too. \
+We need to find better models. \
+
+## Polynomial regression
+Therefore, we will re-select our predictors using regsubsets().\
+Because there are exetremely values and peaks in Bitcoin price, We will consider adding quadratic terms to better captures the Bitcoin_price trends. \
+Since the number of parameters is not too many, we will use a comprehensive search to find the most significant models by calling regsubsets. \
+```{r}
+library(leaps)
+exhaustive_search = summary(regsubsets(Bitcoin_price ~ Transaction_volume + USD_Yuan_exchange_rate + USD_Euro_Exchange_Rate + DJIA_index + NYSE_index + brent_oil_price + WTI_oil_price + Gold_price + president_code + interest_rate + Date_posix + I(Transaction_volume^2) + I(Date_posix ^ 2) + I(USD_Yuan_exchange_rate ^ 2) + I(USD_Euro_Exchange_Rate ^ 2) + I(DJIA_index ^ 2)  + I(NYSE_index ^ 2) + I(brent_oil_price ^ 2) + I(WTI_oil_price ^ 2) + I(Gold_price ^ 2) + I(interest_rate ^ 2), data = data[!(names(data) %in% c("Date", "month"))], nvmax=8))
+# exhaustive_search$which
+p = length(coef(exhaustive_search))
+n = length(resid(exhaustive_search))
+```
+We will limit up to 9 of the most significant predictors in our model. If we look at the RSS and Adjusted R-squared, we will also find that RSS and Adjusted R-sqaured are getting better as we increase our number of predictors until nine. 
+```{r}
+exhaustive_search$rss
+exhaustive_search$adjr2
+(best_r2_ind = which.max(exhaustive_search$adjr2))
+exhaustive_search$which[best_r2_ind, ]
+```
+
+Based on the results of comprehensive search, we have an exhaustive_search_model model.
+```{r}
+exhaustive_search_model = lm(Bitcoin_price ~ Transaction_volume + DJIA_index + NYSE_index + Date_posix + I(Date_posix^2) + I(USD_Yuan_exchange_rate^2) + I(USD_Euro_Exchange_Rate^2) + I(DJIA_index^2) + I(NYSE_index^2),  data = train_data)
+plots_model(exhaustive_search_model)
+store_result(exhaustive_search_model)
+```
+Unfortunately, linearity and constant variance is still violated. Therefore, we will using logarithm as a variance stabilizing transformation
+
+## Logarithmic transformation and Interaction terms
+```{r}
+log_full_interaction_model = lm(log(Bitcoin_price) ~ (. ^ 2) ,  data = train_data)
+plots_model(log_full_interaction_model)
+store_result(log_full_interaction_model)
+```
+After doing log transformation and adding interaction, The mean of the residuals is around not zero therefore linearity is perserved. \
+Equal Variance also seems to be preserved because the the variance looks constant. From the Q-Q plot, the distribution of looks much better than previous models. But the normality of error is still violated at extreme values. \
+```{r}
+plot_prediction(log_full_interaction_model, data, trn_idx, log = TRUE)
+```
+
+## Stepwise model selection
+Since we just add all interaction terms into our model, it looks like we have a overfitting when around year 2017. Besides, we would like to reduce the number of predictors to simplify our model. 
+```{r}
+log_interaction_reduced_model = lm(log(Bitcoin_price) ~ (. ^ 2) ,  data = train_data)
+n = length(resid(log_interaction_reduced_model))
+log_int_mod_back_bic = step(log_interaction_reduced_model, direction = "backward", k = log(n), trace = 0)
+log_int_mod_back_aic = step(log_interaction_reduced_model, direction = "backward", step=0)
+```
+
+
+## Removing influencial points
+We will use Cook’s Distance to calculate influential points. \
+```{r}
+cooksdistance = cooks.distance(log_int_mod_back_bic)
+log_int_mod_back_bic_fix = lm(log_int_mod_back_bic,
+                   data = data,
+                   subset = cooksdistance < 4 / length(cooksdistance))
+plots_model(log_int_mod_back_bic_fix)
+plot_prediction(log_int_mod_back_bic_fix, data, trn_idx, log = TRUE)
+store_result(log_int_mod_back_bic_fix)
+```
+```{r}
+
+cooksdistance = cooks.distance(log_int_mod_back_aic)
+log_int_mod_back_aic_fix = lm(log_int_mod_back_aic,
+                   data = data,
+                   subset = cooksdistance < 4 / length(cooksdistance))
+plots_model(log_int_mod_back_aic_fix)
+plot_prediction(log_int_mod_back_aic_fix, data, trn_idx, log = TRUE)
+store_result(log_int_mod_back_aic_fix)
 ```
 
 ```{r}
-plots_model(gamble_model)
+model_list <- data.frame("model names"=model_names, "num of parameters" = model_params_num, "model_rss" = model_rss, "model_adjr2" = model_adjr2, "model_rmse"=model_rmse, "test_rmse"=test_rmse)
+model_lists
 ```
-
-
-
 
 
 # Discussion
