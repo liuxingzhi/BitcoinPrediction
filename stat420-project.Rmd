@@ -71,7 +71,7 @@ options(digits=6)
 options(warn=-1)
 ```
 
-# data clean
+# Data clean
 ```{r}
 # price of bitcoin
 Bitcoin <- read_csv("Bitcoin Historical Data - Investing.com.csv")
@@ -90,6 +90,7 @@ President <- read_csv("President.csv")
 President$Date = as.Date(President$Date, format="%b %d, %Y")
 plot(president_code ~ Date, data=President)
 ```
+
 The president code is a categorical variable that classifies the United State's incumbent president across 2010 and 2020 into "0" (Barack Obama) and "1" (Donald Trump). We are interested in examining the impacts of these two presidents' respective trade and monetary policy on the financial market. Particularly, Trump's infamous "covfefe" tweets have been pushing markets around. We would like to investigate how this affects the traders of Bitcoin as well. \
 
 ```{r}
@@ -99,6 +100,7 @@ The_interest_rate_for_the_United_States$month <- strftime(The_interest_rate_for_
 The_interest_rate_for_the_United_States$year <- strftime(The_interest_rate_for_the_United_States$Date, "%Y")
 plot(interest_rate ~ Date, data=The_interest_rate_for_the_United_States, type = "o")
 ```
+
 Interest rate is considered as a crucial factor influencing investors' willingness to invest. The longer interest rates stay low, the more investors tend to deploy leverage. This March, the price of Bitcoin rallied to $5,940 as the United States Federal Reserve cut interest rates to 0. \
 
 ```{r}
@@ -155,6 +157,7 @@ Brent_Oil_price$Date = as.Date(Brent_Oil_price$Date, format="%b %d, %Y")
 # colnames(Brent_Oil_price)[2] <- "Brent_oil_price"
 plot(Price ~ Date, data=Brent_Oil_price, type = 'l')
 ```
+
 Oil price plays an important role in the economy due to increasing global demand for oil to support industrialization and urbanization. Higher oil prices tend to make production more expensive for businesses and therefore raise commodity prices. Oil price increases are also generally thought to increase inflation and reduce economic growth. We want to see how Bitcoin is related to this market influencer. \
 
 
@@ -322,6 +325,7 @@ plot_prediction = function(model, data, trn_idx, log=FALSE) {
 ## Investigating the Predictors
 ### Overview of the Dataset
 Our potential predictors of Bitcoin price are
+
 - Transaction Volume
 - US Chinese Yuan exchange rate
 - US European Dollar exhcange rate
