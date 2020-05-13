@@ -57,7 +57,7 @@ Narrative of your step-by-step decision making process throughout the analysis a
 # install.packages("sqldf")
 # install.packages("corrplot")
 ```
-
+### Loading necessary Libraries
 ```{r}
 library(readr)
 library("readxl")
@@ -85,19 +85,24 @@ plot(Volume ~ Date, data=Bitcoin, type = "l")
 ```
 
 ```{r}
+# Incumbent president 
 President <- read_csv("President.csv")
 President$Date = as.Date(President$Date, format="%b %d, %Y")
 plot(president_code ~ Date, data=President)
 ```
+The president code is a categorical variable that classifies the United State's incumbent president across 2010 and 2020 into "0" (Barack Obama) and "1" (Donald Trump). We are interested in examining the impacts of these two presidents' respective trade and monetary policy on the financial market. Particularly, Trump's infamous "covfefe" tweets have been pushing markets around. We would like to investigate how this affects the traders of Bitcoin as well. \
 
 ```{r}
+# Interest rate
 The_interest_rate_for_the_United_States<- read_csv("The interest rate for the United States, from 2010 - 2020.csv")
 The_interest_rate_for_the_United_States$month <- strftime(The_interest_rate_for_the_United_States$Date, "%m")
 The_interest_rate_for_the_United_States$year <- strftime(The_interest_rate_for_the_United_States$Date, "%Y")
 plot(interest_rate ~ Date, data=The_interest_rate_for_the_United_States, type = "o")
 ```
+Interest rate is considered as a crucial factor influencing investors' willingness to invest. The longer interest rates stay low, the more investors tend to deploy leverage. This March, the price of Bitcoin rallied to $5,940 as the United States Federal Reserve cut interest rates to 0. \
 
 ```{r}
+# Exchange rates
 US_dollar_yuan_exchange_rate <- read_csv("US dollar-yuan exchange rate.csv")
 US_dollar_yuan_exchange_rate$Date = as.Date(US_dollar_yuan_exchange_rate$Date, format="%m/%d/%y")
 plot(exchange_rate ~ Date, data = US_dollar_yuan_exchange_rate, type = 'l')
@@ -107,13 +112,22 @@ Euro_to_US_exchange_rate$Date = as.Date(Euro_to_US_exchange_rate$Date, format="%
 Euro_to_US_exchange_rate$exchange_rate = 1/Euro_to_US_exchange_rate$exchange_rate
 plot(exchange_rate  ~ Date, data = Euro_to_US_exchange_rate, type = 'l')
 ```
+
+Exchange rates also play a relevant role in the financial market as they affect foregin investors' sentiment and the transaction costs. For example, China has introduced several capital controls with regards to Bitcoin speculation. Given that more than 90% ofthe bitcoins are traded with the yuan, and more than 70% of the mining takes places in China, we believe the exchange rate of the US dollar with the yuan is an influential factor in determining Bitcoin prices. \
+
 ```{r}
+# Gold price
 Gold <- read_csv("Gold Futures Historical Data.csv")
 Gold$Date = as.Date(Gold$Date, format="%b %d, %Y")
 plot(Price ~ Date, data=Gold, type='l')
 ```
+
+Gold has been a hedge and safe haven for investors. Since Bitcoins usually react positively to great financial movements, we would like to study bitcoin’s relationship with precious metals price in a dynamic environment and investigate whether  bitcoins can be a hedge or safe haven asset under market uncertainty scenarios. \
+
+
 This dataset we will use the Volume and Price columns.
 ```{r}
+# Stock market indices
 Dow_Jones_Industrial_Average <- read_csv("Dow Jones Industrial Average Historical Data.csv")
 Dow_Jones_Industrial_Average$Date = as.Date(Dow_Jones_Industrial_Average$Date, format="%b %d, %Y")
 plot(Price ~ Date, data=Dow_Jones_Industrial_Average, type = 'l')
@@ -124,11 +138,13 @@ NYSE_Composite_Index$Date = as.Date(NYSE_Composite_Index$Date, format="%b %d, %Y
 plot(Price ~ Date, data=NYSE_Composite_Index, type = 'l')
 ```
 
+Dow Jones Industrial Average and NYSE Composite Index are major U.S. stock indices. We want to investigate the relationship between Bitcoin and these stock market barometers and examine whether they behave differently under market turmoil. \
 
 
 This dataset we will use the Adj Close and volume columns.
 
 ```{r}
+# Oil prices
 WTI_oil_price <- read_csv("Crude Oil WTI Futures Historical Data.csv")
 WTI_oil_price$Date = as.Date(WTI_oil_price$Date, format="%b %d, %Y")
 # colnames(WTI_oil_price)[2] <- "WTI_oil_price"
@@ -139,9 +155,11 @@ Brent_Oil_price$Date = as.Date(Brent_Oil_price$Date, format="%b %d, %Y")
 # colnames(Brent_Oil_price)[2] <- "Brent_oil_price"
 plot(Price ~ Date, data=Brent_Oil_price, type = 'l')
 ```
+Oil price plays an important role in the economy due to increasing global demand for oil to support industrialization and urbanization. Higher oil prices tend to make production more expensive for businesses and therefore raise commodity prices. Oil price increases are also generally thought to increase inflation and reduce economic growth. We want to see how Bitcoin is related to this market influencer. \
+
 
 ## Data Cleaning and preparing
-combine all those csv to a one giant dataframe \
+### Combine all those csv to a one giant dataframe
 Because we are using gold price, stock price, oil price, etc to predict Bitcoin price, it's reasonable to expect a few days delay for the Bitcoin price to reflect what happen in stock and futures markets. For this model, we set the reponse time for Bitcoin price to 15 days, which assumes that Bitcoin price will react about 15 days later than the gold price, stock price, oil price, etc changed.
 ```{r}
 sql =  glue("
@@ -221,7 +239,7 @@ combined_weekdays = combined_weekdays[!(names(combined_weekdays) %in% c("month")
 ```
 
 
-## Testing
+### Testing
 Bitcoin did not become popularly traded until 2014, therefore we will use all data from 2014 to 2020 because Bitcoin does not really count as a financial product before 2014. Data before 2014 are ignored. \
 In order to test the effectiveness of our model, we randomly select half of the observations as our training dataset and the other half as our testing datasets. \
 ```{r messages=FALSE, warnings=FALSE}
@@ -301,7 +319,8 @@ plot_prediction = function(model, data, trn_idx, log=FALSE) {
          text.font=4, bg='antiquewhite')
 }
 ```
-
+## Investigating the Predictors
+### Overview of the Dataset
 Our potential predictors of Bitcoin price are
 - Transaction Volume
 - US Chinese Yuan exchange rate
@@ -316,11 +335,12 @@ Our potential predictors of Bitcoin price are
 - Date time (Every 210,000 blocks mined, or about every four years, the reward given to Bitcoin miners for processing transactions is cut in half) Therefore, theoretically Bitcoin will increase its value as time passes by.
 - Year (Categorical variable) World situation may change every year. Bitcoin price is also affected by black swan events, or pandemic like what we are having now.
 
+### Pairs
 We’ll use the pairs() plot to determine which variables may benefit from a quadratic or logarithm relationship with the response.
 ```{r messages=FALSE, warnings=FALSE}
 pairs(data[!(names(data) %in% c("Date", "month","year"))], col = "dodgerblue")
 ```
-
+### Transformation
 Next, we will use the boxcox() function to find the best transformation of the form considered by the Box-Cox method.
 ```{r messages=FALSE, warnings=FALSE}
 model = lm(Bitcoin_price ~ . ,data=combined_monthly)
@@ -330,6 +350,7 @@ boxcox(model,
 ```
 we see a very high log likelihood when λ is from about -0.3 to 0.1, which recommends a transformation of log transformation. \
 
+### Interaction
 In additional to pair plot, we use a correlation matrix to find all possible interaction between each of our predictors.
 ```{r messages=FALSE, warnings=FALSE}
 # find correlation between all of these predictors
@@ -342,7 +363,6 @@ corrplot(M, method = "circle")
 ```
 It seems that Transaction volume, DJIA_index, NYSE_index and president term, interest rate and Date time has a positive relationship with Bitcoin price. We are going to pay more attention to these predictors. \
 Meanwhile, NYSE Composite Index and Dow Jones Industrial Average are high correlated to each other. SO are the Brent oil futures and WTI oil futures. These intercorrelation might be harmful to our model. \
-
 
 
 
