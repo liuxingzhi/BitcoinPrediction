@@ -1,0 +1,545 @@
+---
+title: " Financial and Risk management in Applied Statistics with R"
+date: "2020/5"
+output:
+  html_document:
+    theme: readable
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+
+
+```{r setup, echo = FALSE, message = FALSE, warning = FALSE}
+options(scipen = 1, digits = 4, width = 80)
+library(knitr)
+opts_chunk$set(cache = TRUE, autodep = TRUE)
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+```
+
+
+# Introduction 
+
+
+Bitcoin, a special virtual currency, has always been the focus of research. Our group is also full of interest in this mysterious emerging currency, hoping to explore how Bitcoin and other gold coins, goods, stock markets, and even the relationship between countries. We have used many interesting examples, such as the US president as a categorical variable. We also used some common influencing factors, such as interest rates, European and American currency ratios, gold prices, Dow Jones index, etc. Most of our data comes from kaggle and some official websites. We hope to explore the relationship between bitcoin and these variables to gain a deeper understanding of the impact and significance of bitcoin on the world.
+In the next section, you will see in detail the introduction of each of our databases and the adjustments we have made to them.
+
+
+# Methods 
+
+A list of packages that need to be installed to run this project
+```{r}
+# install necessary packages
+# install.packages("readxl")
+# install.packages("sqldf")
+# install.packages("corrplot")
+```
+## Loading necessary Libraries
+```{r}
+library(readr)
+library("readxl")
+library(sqldf)
+library(glue)
+library("corrplot")
+library(caret)
+library(leaps)
+library(MASS)
+options(digits=6)
+options(warn=-1)
+```
+
+## Data clean
+```{r}
+# price of bitcoin
+Bitcoin <- read_csv("Bitcoin Historical Data - Investing.com.csv")
+Bitcoin$Date = as.Date(Bitcoin$Date, format="%b %d, %Y")
+Bitcoin$month <- strftime(Bitcoin$Date, "%m")
+Bitcoin$year <- strftime(Bitcoin$Date, "%Y")
+plot(Price ~ Date, data=Bitcoin, type = "l")
+```
+```{r}
+plot(Volume ~ Date, data=Bitcoin, type = "l")
+```
+
+```{r}
+# Incumbent president 
+President <- read_csv("President.csv")
+President$Date = as.Date(President$Date, format="%b %d, %Y")
+plot(president_code ~ Date, data=President)
+```
+
+The president code is a categorical variable that classifies the United State's incumbent president across 2010 and 2020 into "0" (Barack Obama) and "1" (Donald Trump). We are interested in examining the impacts of these two presidents' respective trade and monetary policy on the financial market. Particularly, Trump's infamous "covfefe" tweets have been pushing markets around. We would like to investigate how this affects the traders of Bitcoin as well. \
+
+```{r}
+# Interest rate
+The_interest_rate_for_the_United_States<- read_csv("The interest rate for the United States, from 2010 - 2020.csv")
+The_interest_rate_for_the_United_States$month <- strftime(The_interest_rate_for_the_United_States$Date, "%m")
+The_interest_rate_for_the_United_States$year <- strftime(The_interest_rate_for_the_United_States$Date, "%Y")
+plot(interest_rate ~ Date, data=The_interest_rate_for_the_United_States, type = "o")
+```
+
+Interest rate is considered as a crucial factor influencing investors' willingness to invest. The longer interest rates stay low, the more investors tend to deploy leverage. This March, the price of Bitcoin rallied to $5,940 as the United States Federal Reserve cut interest rates to 0. \
+
+```{r}
+# Exchange rates
+US_dollar_yuan_exchange_rate <- read_csv("US dollar-yuan exchange rate.csv")
+US_dollar_yuan_exchange_rate$Date = as.Date(US_dollar_yuan_exchange_rate$Date, format="%m/%d/%y")
+plot(exchange_rate ~ Date, data = US_dollar_yuan_exchange_rate, type = 'l')
+
+Euro_to_US_exchange_rate <- read_csv("euro-dollar-exchange-rate-historical-chart.csv")
+Euro_to_US_exchange_rate$Date = as.Date(Euro_to_US_exchange_rate$Date, format="%m/%d/%y")
+Euro_to_US_exchange_rate$exchange_rate = 1/Euro_to_US_exchange_rate$exchange_rate
+plot(exchange_rate  ~ Date, data = Euro_to_US_exchange_rate, type = 'l')
+```
+
+Exchange rates also play a relevant role in the financial market as they affect foregin investors' sentiment and the transaction costs. For example, China has introduced several capital controls with regards to Bitcoin speculation. Given that more than 90% ofthe bitcoins are traded with the yuan, and more than 70% of the mining takes places in China, we believe the exchange rate of the US dollar with the yuan is an influential factor in determining Bitcoin prices. \
+
+```{r}
+# Gold price
+Gold <- read_csv("Gold Futures Historical Data.csv")
+Gold$Date = as.Date(Gold$Date, format="%b %d, %Y")
+plot(Price ~ Date, data=Gold, type='l')
+```
+
+Gold has been a hedge and safe haven for investors. Since Bitcoins usually react positively to great financial movements, we would like to study bitcoin’s relationship with precious metals price in a dynamic environment and investigate whether  bitcoins can be a hedge or safe haven asset under market uncertainty scenarios. \
+
+
+This dataset we will use the Volume and Price columns.
+```{r}
+# Stock market indices
+Dow_Jones_Industrial_Average <- read_csv("Dow Jones Industrial Average Historical Data.csv")
+Dow_Jones_Industrial_Average$Date = as.Date(Dow_Jones_Industrial_Average$Date, format="%b %d, %Y")
+plot(Price ~ Date, data=Dow_Jones_Industrial_Average, type = 'l')
+```
+```{r}
+NYSE_Composite_Index <- read_csv("NYSE Composite Historical Data.csv")
+NYSE_Composite_Index$Date = as.Date(NYSE_Composite_Index$Date, format="%b %d, %Y")
+plot(Price ~ Date, data=NYSE_Composite_Index, type = 'l')
+```
+
+Dow Jones Industrial Average and NYSE Composite Index are major U.S. stock indices. We want to investigate the relationship between Bitcoin and these stock market barometers and examine whether they behave differently under market turmoil. \
+
+
+This dataset we will use the Adj Close and volume columns.
+
+```{r}
+# Oil prices
+WTI_oil_price <- read_csv("Crude Oil WTI Futures Historical Data.csv")
+WTI_oil_price$Date = as.Date(WTI_oil_price$Date, format="%b %d, %Y")
+# colnames(WTI_oil_price)[2] <- "WTI_oil_price"
+plot(Price ~ Date, data=WTI_oil_price, type = 'l')
+
+Brent_Oil_price <- read_csv("Brent Oil Futures Historical Data.csv")
+Brent_Oil_price$Date = as.Date(Brent_Oil_price$Date, format="%b %d, %Y")
+# colnames(Brent_Oil_price)[2] <- "Brent_oil_price"
+plot(Price ~ Date, data=Brent_Oil_price, type = 'l')
+```
+
+Oil price plays an important role in the economy due to increasing global demand for oil to support industrialization and urbanization. Higher oil prices tend to make production more expensive for businesses and therefore raise commodity prices. Oil price increases are also generally thought to increase inflation and reduce economic growth. We want to see how Bitcoin is related to this market influencer. \
+
+
+## Data Cleaning and preparing
+### Combine all those csv to a one giant dataframe
+Because we are using gold price, stock price, oil price, etc to predict Bitcoin price, it's reasonable to expect a few days delay for the Bitcoin price to reflect what happen in stock and futures markets. For this model, we set the reponse time for Bitcoin price to 15 days, which assumes that Bitcoin price will react about 15 days later than the gold price, stock price, oil price, etc changed.
+```{r}
+sql =  glue("
+select Bitcoin.Date,
+       Bitcoin.Price                as Bitcoin_price,
+       Bitcoin.Volume               as Transaction_volume,
+       exchange_China.exchange_rate as USD_Yuan_exchange_rate,
+       exchange_Euro.exchange_rate  as USD_Euro_Exchange_Rate,
+       DJIA.Price                   as DJIA_index,
+       NYSE.Price                   as NYSE_index,
+       Brent_Oil_price.Price        as brent_oil_price,
+       WTI_oil_price.Price          as WTI_oil_price,
+       Gold.Price                   as Gold_price,
+       President.president_code,
+       interest.interest_rate,
+       Bitcoin.month,
+       Bitcoin.year
+from Bitcoin
+         left outer join US_dollar_yuan_exchange_rate as exchange_China
+                         on exchange_China.Date = Bitcoin.Date - 15
+         left outer join Euro_to_US_exchange_rate as exchange_Euro
+                         on exchange_Euro.Date = Bitcoin.Date - 15
+         left outer join Dow_Jones_Industrial_Average as DJIA
+                         on DJIA.Date = Bitcoin.Date - 15
+         left outer join NYSE_Composite_Index as NYSE
+                         on NYSE.Date = Bitcoin.Date - 15
+         left outer join Brent_Oil_price
+                         on Brent_Oil_price.Date = Bitcoin.Date - 15
+         left outer join WTI_oil_price
+                         on WTI_oil_price.Date = Bitcoin.Date - 15
+         left outer join President
+                         on President.Date = Bitcoin.Date - 15
+         left outer join Gold
+                         on Gold.Date = Bitcoin.Date - 15
+         left outer join The_interest_rate_for_the_United_States as interest
+                         on interest.month = Bitcoin.month
+                             and interest.year = Bitcoin.year
+where Bitcoin.Date between {c (1.0, as.Date('2014-06-01'))[2]} and {c (1.0, as.Date('2020-04-30'))[2]}
+order by Bitcoin.Date asc")
+combined_daily = sqldf(sql)
+combined_daily$Date_posix = c(1, as.Date(combined_daily$Date))[-c(1)]
+combined_daily$president_code = as.factor(combined_daily$president_code)
+combined_weekdays = na.omit(combined_daily)
+monthly_volume_df = sqldf("
+select month, year, sum(combined_daily.Transaction_volume) as Transaction_volume
+       from combined_daily
+       group by combined_daily.month, combined_daily.year")
+
+combined_monthly = sqldf("
+select Date,
+       Bitcoin_price,
+       monthly_volume_df.Transaction_volume,
+       USD_Yuan_exchange_rate,
+       USD_Euro_Exchange_Rate,
+       DJIA_index,
+       NYSE_index,
+       brent_oil_price,
+       WTI_oil_price,
+       Gold_price,
+       president_code,
+       interest_rate,
+       Date_posix,
+       combined_weekdays.year
+from combined_weekdays
+join monthly_volume_df
+on monthly_volume_df.month = combined_weekdays.month
+and monthly_volume_df.year = combined_weekdays.year
+where combined_weekdays.Date in
+      (select max(combined_weekdays.Date)
+       from combined_weekdays
+       group by combined_weekdays.month, combined_weekdays.year)
+")
+
+combined_weekdays = combined_weekdays[!(names(combined_weekdays) %in% c("month"))]
+# combined_monthly
+# plot(combined_monthly$Date, combined_monthly$Bitcoin_price, type = "l", col = "blue")
+```
+
+
+### Testing
+Bitcoin did not become popularly traded until 2014, therefore we will use all data from 2014 to 2020 because Bitcoin does not really count as a financial product before 2014. Data before 2014 are ignored. \
+In order to test the effectiveness of our model, we randomly select half of the observations as our training dataset and the other half as our testing datasets. \
+```{r messages=FALSE, warnings=FALSE}
+data = combined_weekdays
+trn_idx = sample(nrow(data), nrow(data) / 2)
+monthly_train = combined_monthly[trn_idx, ]
+monthly_test = combined_monthly[-trn_idx, ]
+weekday_train = combined_weekdays[trn_idx, ]
+weekday_test = combined_weekdays[-trn_idx, ]
+train_data = weekday_train
+```
+
+Helper functions \
+```{r messages=FALSE, warnings=FALSE}
+model_names = c()
+model_params_num = c()
+model_rss = c()
+model_adjr2 = c()
+model_rmse = c()
+test_rmse = c()
+
+store_result = function(model, model_name, log = FALSE){
+  model = model
+  rmses = calc_rmse(model, data, trn_idx, log)
+  model_names <<- c(model_names, model_name)
+  model_params_num <<- c(model_params_num, length(coefficients(model)))
+  model_rss <<- c(model_rss, deviance(model))
+  model_adjr2 <<- c(model_adjr2, summary(model)$adj.r)
+  model_rmse <<- c(model_rmse, rmses[1])
+  test_rmse <<- c(test_rmse, rmses[2])
+}
+
+calc_rmse = function(model, data, trn_idx, log = FALSE) {
+  data_train = data[trn_idx, ]
+  data_test = data[-trn_idx, ]
+  pred = predict(model, data_train)
+  if(log){
+    pred = exp(pred)
+  }
+
+  actual = data_train$Bitcoin_price
+  train_rmse = sqrt(sum((pred - actual)^2) / (nrow(data) / 2) )
+
+  pred = predict(model, data_train)
+  if(log){
+    pred = exp(pred)
+  }
+  actual = data_train$Bitcoin_price
+  test_rmse = sqrt(sum((pred - actual)^2) / ((nrow(data) / 2)  - length(coefficients(model))))
+  c(train_rmse, test_rmse)
+}
+
+plots_model = function(model){
+  par(mfrow = c(1, 2))
+  plot(fitted(model), resid(model), col = "grey", pch = 20,
+  xlab = "Fitted", ylab = "Residuals", main = "Fitted vs Residuals")
+  abline(h = 0, col = "darkorange", lwd = 2)
+  qqnorm(resid(model), col = "darkgrey")
+  qqline(resid(model), col = "dodgerblue", lwd = 2)
+}
+
+plot_prediction = function(model, data, trn_idx, log=FALSE) {
+  par(mfrow = c(1, 1))
+  data_test = data[-trn_idx, ]
+  pred = predict(model, data)
+  if(log){
+    pred = exp(pred)
+  }
+
+  plot(data$Date, data$Bitcoin_price, type = "l", col = "blue")
+  points(data$Date, pred, type = "l", col = "green")
+  title(main = deparse(substitute(model)))
+  legend("topleft", 
+         legend=c("Actually", "Predicted"), 
+         col=c("blue", "green"), lty=1:1, cex=0.8, 
+         text.font=4, bg='antiquewhite')
+}
+```
+## Investigating the Predictors
+### Overview of the Dataset
+Our potential predictors of Bitcoin price are
+
+- Transaction Volume
+- US Chinese Yuan exchange rate
+- US European Dollar exhcange rate
+- NYSE Composite Index
+- Dow Jones Industrial Average
+- Brent Oil futures
+- WTI Oil futures
+- Gold futures
+- President terms (Dummy Variable)
+- Federal Interest rates
+- Date time (Every 210,000 blocks mined, or about every four years, the reward given to Bitcoin miners for processing transactions is cut in half) Therefore, theoretically Bitcoin will increase its value as time passes by.
+- Year (Categorical variable) World situation may change every year. Bitcoin price is also affected by black swan events, or pandemic like what we are having now.
+
+### Pairs
+We’ll use the pairs() plot to determine which variables may benefit from a quadratic or logarithm relationship with the response.
+```{r messages=FALSE, warnings=FALSE}
+pairs(data[!(names(data) %in% c("Date", "month","year"))], col = "dodgerblue")
+```
+### Transformation
+Next, we will use the boxcox() function to find the best transformation of the form considered by the Box-Cox method.
+```{r messages=FALSE, warnings=FALSE}
+model = lm(Bitcoin_price ~ . ,data=combined_monthly)
+boxcox(model,
+       lambda = seq(-0.5, 0.5, by = 0.005),
+       plotit = TRUE)
+```
+we see a very high log likelihood when λ is from about -0.3 to 0.1, which recommends a transformation of log transformation. \
+
+### Interaction
+In additional to pair plot, we use a correlation matrix to find all possible interaction between each of our predictors.
+```{r messages=FALSE, warnings=FALSE}
+# find correlation between all of these predictors
+log_transform = combined_monthly
+log_transform$Transaction_volume = log(log_transform$Transaction_volume)
+M <- cor(x=log_transform[!(names(log_transform) %in% c("Date", "month","year", "president_code"))], use = "everything", method="pearson") # get correlations
+# M
+library('corrplot') #package corrplot
+corrplot(M, method = "circle")
+```
+It seems that Transaction volume, DJIA_index, NYSE_index and president term, interest rate and Date time has a positive relationship with Bitcoin price. We are going to pay more attention to these predictors. \
+Meanwhile, NYSE Composite Index and Dow Jones Industrial Average are high correlated to each other. SO are the Brent oil futures and WTI oil futures. These intercorrelation might be harmful to our model. \
+
+
+
+# Results 
+
+
+## Simplest model, Multiple Regression
+Let's first use a full_mlr_model as a starting point. It is not a good model, but we will try to improve this model using parameter transformation, variable selection and model building techniques
+```{r messages=FALSE, warnings=FALSE}
+full_mlr_model = lm(Bitcoin_price ~ ., train_data[!(names(data) %in% c("Date", "month"))])
+plots_model(full_mlr_model)
+store_result(full_mlr_model, "full_mlr_model")
+```
+As shown by the above two graph, the variance is not constant, the linearly is also violated. And according to Q-Q plot, Normality of error is violated, too. 
+
+We need to find better models. 
+
+## Polynomial regression
+Therefore, we will re-select our predictors using regsubsets().
+Because there are exetremely values and peaks in Bitcoin price, We will consider adding quadratic terms to better captures the Bitcoin_price trends. 
+
+Since the number of parameters is not too many, we will use a comprehensive search to find the most significant models by calling regsubsets. 
+
+```{r messages=FALSE, warnings=FALSE}
+exhaustive_search = summary(regsubsets(Bitcoin_price ~ Transaction_volume + USD_Yuan_exchange_rate + USD_Euro_Exchange_Rate + DJIA_index + NYSE_index + brent_oil_price + WTI_oil_price + Gold_price + president_code + interest_rate + Date_posix + I(Transaction_volume^2) + I(Date_posix ^ 2) + I(USD_Yuan_exchange_rate ^ 2) + I(USD_Euro_Exchange_Rate ^ 2) + I(DJIA_index ^ 2)  + I(NYSE_index ^ 2) + I(brent_oil_price ^ 2) + I(WTI_oil_price ^ 2) + I(Gold_price ^ 2) + I(interest_rate ^ 2), data = data[!(names(data) %in% c("Date", "month"))], nvmax=8))
+# exhaustive_search$which
+p = length(coef(exhaustive_search))
+n = length(resid(exhaustive_search))
+```
+
+We will limit up to 9 of the most significant predictors in our model. If we look at the RSS and Adjusted R-squared, we will also find that RSS and Adjusted R-sqaured are getting better as we increase our number of predictors until nine. 
+```{r messages=FALSE, warnings=FALSE}
+exhaustive_search$rss
+exhaustive_search$adjr2
+(best_r2_ind = which.max(exhaustive_search$adjr2))
+exhaustive_search$which[best_r2_ind, ]
+```
+
+
+Based on the results of comprehensive search, we have an exhaustive_search_model model.
+```{r messages=FALSE, warnings=FALSE}
+exhaustive_search_model = lm(Bitcoin_price ~ Transaction_volume + DJIA_index + NYSE_index + Date_posix + I(Date_posix^2) + I(USD_Yuan_exchange_rate^2) + I(USD_Euro_Exchange_Rate^2) + I(DJIA_index^2) + I(NYSE_index^2),  data = train_data)
+plots_model(exhaustive_search_model)
+store_result(exhaustive_search_model, "exhaustive_search_model")
+```
+Unfortunately, linearity and constant variance is still violated. Therefore, we will using logarithm as a variance stabilizing transformation
+
+## Logarithmic transformation and Interaction terms
+
+We will try to a log model and a log model adding all possible interaction terms
+```{r messages=FALSE, warnings=FALSE}
+log_model = lm(log(Bitcoin_price) ~ . ,  data = train_data, log = TRUE)
+store_result(log_model, "log_model")
+
+log_full_interaction_model = lm(log(Bitcoin_price) ~ (. ^ 2) ,  data = train_data, log = TRUE)
+plots_model(log_full_interaction_model)
+store_result(log_full_interaction_model, "log_full_interaction_model")
+```
+After doing log transformation and adding interaction, The mean of the residuals is around not zero therefore linearity is perserved. \
+
+Equal Variance also seems to be preserved because the the variance looks constant. From the Q-Q plot, the distribution of looks much better than previous models. But the normality of error is still violated at extreme values. \
+```{r messages=FALSE, warnings=FALSE}
+plot_prediction(log_full_interaction_model, data, trn_idx, log = TRUE)
+```
+
+## Stepwise model selection
+
+Since we just add all interaction terms into our model, it looks like we have a overfitting when around year 2017. Besides, we would like to reduce the number of predictors to simplify our model. 
+```{r messages=FALSE, warnings=FALSE}
+n = length(resid(log_full_interaction_model))
+log_full_int_mod_back_bic = step(log_full_interaction_model, direction = "backward", k = log(n), trace = 0)
+log_full_int_mod_back_aic = step(log_full_interaction_model, direction = "backward", step=0)
+```
+
+
+Use backward AIC and BIC method to simplify models.
+```{r messages=FALSE, warnings=FALSE}
+log_interaction_only_year = lm(log(Bitcoin_price) ~ (. * year) ,  data = train_data)
+n = length(resid(log_interaction_only_year))
+
+log_groupby_year_back_bic = step(log_interaction_only_year, direction = "backward", k = log(n), trace = 0)
+store_result(log_groupby_year_back_bic, "log_groupby_year_back_bic", log = TRUE)
+log_groupby_year_back_aic = step(log_interaction_only_year, direction = "backward", step=0)
+store_result(log_groupby_year_back_aic, "log_groupby_year_back_aic", log = TRUE)
+```
+
+## Removing influencial points and alternative models
+We will first use Cook’s Distance to calculate influential points and remove outliers. Next we will show several potential good models that explains bitcoin prices trends
+```{r messages=FALSE, warnings=FALSE}
+cooksdistance = cooks.distance(log_groupby_year_back_bic)
+log_groupby_year_back_bic_fix = lm(log_groupby_year_back_bic,
+                   data = data,
+                   subset = cooksdistance < 4 / length(cooksdistance))
+plot_prediction(log_groupby_year_back_bic_fix, data, trn_idx, log = TRUE)
+store_result(log_groupby_year_back_bic_fix, "log_groupby_year_back_bic_fix", log = TRUE)
+```
+
+\ 
+Another alternative model that explains Bitcoin price well.
+```{r messages=FALSE, warnings=FALSE}
+cooksdistance = cooks.distance(log_groupby_year_back_aic)
+log_groupby_year_back_aic_fix = lm(log_groupby_year_back_aic,
+                   data = data,
+                   subset = cooksdistance < 4 / length(cooksdistance))
+plot_prediction(log_groupby_year_back_aic_fix, data, trn_idx, log = TRUE)
+store_result(log_groupby_year_back_aic_fix, "log_groupby_year_back_aic_fix", log = TRUE)
+```
+\ 
+More alternative model that explains Bitcoin price well.
+```{r messages=FALSE, warnings=FALSE}
+cooksdistance = cooks.distance(log_full_int_mod_back_bic)
+log_int_mod_back_bic_fix = lm(log_full_int_mod_back_bic,
+                   data = data,
+                   subset = cooksdistance < 4 / length(cooksdistance))
+plots_model(log_int_mod_back_bic_fix)
+plot_prediction(log_int_mod_back_bic_fix, data, trn_idx, log = TRUE)
+store_result(log_int_mod_back_bic_fix, "log_int_mod_back_bic_fix", log = TRUE)
+```
+\ 
+More alternative model that explains Bitcoin price well.
+```{r messages=FALSE, warnings=FALSE}
+
+cooksdistance = cooks.distance(log_full_int_mod_back_aic)
+log_int_mod_back_aic_fix = lm(log_full_int_mod_back_aic,
+                   data = data,
+                   subset = cooksdistance < 4 / length(cooksdistance))
+plots_model(log_int_mod_back_aic_fix)
+plot_prediction(log_int_mod_back_aic_fix, data, trn_idx, log = TRUE)
+store_result(log_int_mod_back_aic_fix, "log_int_mod_back_aic_fix", log = TRUE)
+```
+
+```{r warnings=FALSE}
+model_list <- data.frame("model names"=model_names, "num of parameters" = model_params_num, "model_adjr2" = model_adjr2, "model_rmse"=model_rmse, "test_rmse"=test_rmse)
+
+knitr::kable(model_list, digits = getOption("digits"), row.names = NA,
+  col.names = colnames(model_list), align = "c", caption = NULL, label = NULL,
+  format.args = list(), escape = TRUE)
+```
+
+As shown in the figure above, we have tested and recorded each model. In the end, we think that log_groupby_year_back_bic is our favorite model, because his var number is reasonable, and it will not be overfit, and its fit has reached Ninety-nine percent, the model also performed well in the test and train tests, and the difference between the rmse values of the two was not large.
+
+# Discussion
+
+After selecting the model log_groupby_year_back_bic, we return and discuss its importance. We collected information on the Internet and found that the advantage of this time-level fitting is that Bitcoin's performance before and after the occurrence of some special events is different. For example, trade wars and technological leaks have caused the relationship between Bitcoin and variables to actually change. Therefore, I think the model we chose makes sense. Of course, our model focused more on explaining than predicting, and the actual direction of Bitcoin is more complicated than this model. 
+
+As a virtual currency, Bitcoin has a high degree of risk and randomness. As we explored in this final project, the price of Bitcoin is related to exchange rate of currency, government policies and other finanical product. In different years, the relation coefficiency are likely to change. Therefore, more often than not, the purpose of investing in Bitcoin is not speculating but risk hedging. The mainstream opinion from a financial advisor perspective is to allocate no more than 1% asset in Bitcoin due to its risk and randomness because if investing high than 1%, our gross investment income will be greatly impacted by Bitcoin. But a little bit investment in Bitcoin might generate a significant rewards, too. We do not encourage speculation but we promote idea of risk hedging. 
+
+
+# Appendix
+The appendix section should contain code and analysis that is used, but that would have otherwise cluttered the report or is not directly related to the choice of model. Do not simply dump code in here. Only utilize the appendix to supplement the primary focus of the report. The appendix should also conclude with the names of the group members.
+
+Write in complete sentences and pay attention to grammar, spelling, readability and presentation. If you include a table or chart, make sure you say something about it. If you’re not discussing a result, then it doesn’t belong in your report.
+
+Submit the following three items in a .zip file just as you do in homework assignments.
+
+your selected data,
+a .Rmd program file,
+and the project report (.html file)
+# Reference
+
+
+Bitcoin transaction data from July 2010 to May 2020
+https://www.investing.com/crypto/bitcoin/historical-data
+Variables: the sum of the transaction, time of the transaction
+
+Top 100 cryptocurrencies by market
+https://www.kaggle.com/natehenderson/top-100-cryptocurrency-historical-data
+Variables: ATC Coin Clock Coin
+
+NYSE Composite Index data from April 2008 to April 2018 https://finance.yahoo.com/quote/%5ENYA/history?period1=1208217600&period2=1523750400&interval=1d&filter=history&frequency=1d
+Variables: Trade volume, Adjusted close price
+
+Individual company’s stock price:
+Apple stock price from April 2010 to May 2020
+https://www.investing.com/equities/apple-computer-inc-historical-data
+Variables: Trade volume, Price
+
+Dow Jones Industrial Average from April 2008 to April 2018
+https://finance.yahoo.com/quote/%5EDJI/history?period1=1208304000&period2=1523836800&interval=1d&filter=history&frequency=1d
+Variables: Trade volume, Adjusted close price
+
+Crude oil price from 2020 to April 2020
+https://www.investing.com/commodities/brent-oil-historical-data
+https://www.investing.com/commodities/crude-oil-historical-data
+Variables: Crude oil daily price
+
+The interest rate for the United States, from 2010 - 2020
+https://fred.stlouisfed.org/series/INTDSRUSM193N
+Variable: nominal interest rate
+
+Gold future price from 2010 - 2020
+https://www.investing.com/commodities/gold-historical-data
+Variable: Gold daily price
+
+### Team members:
+- Siyu Niu
+- Han Jiang
+- Xinyi Peng
+- Xingzhi Liu
